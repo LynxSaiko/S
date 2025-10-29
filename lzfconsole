@@ -132,10 +132,7 @@ class LazyFramework:
         self.loaded_module: Optional[ModuleInstance] = None
         self.session = {"user": os.getenv("USER", "unknown")}
         self.scan_modules()
-        
-    def _ensure_dirs(self):
-        for d in (MODULE_DIR, EXAMPLES_DIR, BANNER_DIR):
-            d.mkdir(parents=True, exist_ok=True)
+        self.silent = True
 
     def scan_modules(self):
         #self._ensure_dirs()
@@ -173,10 +170,12 @@ class LazyFramework:
                 mod = importlib.util.module_from_spec(spec)
                 spec.loader.exec_module(mod)
                 self.loaded_modules.append(module_key)
-                console.print(f"[green]Modul [bold]{module_key}[/bold] berhasil dimuat otomatis![/green]")
+                if not getattr(self, "silent", True):
+                   console.print(f"[green]Modul [bold]{module_key}[/bold] berhasil dimuat otomatis![/green]")
             except Exception as e:
-                console.print(f"[red]Error saat memuat modul {module_key}: {e}[/red]")
-
+                #console.print(f"[red]Error saat memuat modul {module_key}: {e}[/red]")
+                if not getattr(self, "silent", False):
+                   console.print(f"[red]Error saat memuat {module_key}: {e}[/red]")
 
 
     def _read_meta(self, path):
@@ -371,7 +370,7 @@ class LazyFramework:
         MAX_MODULE_WIDTH = terminal_width // 4
         MAX_RANK_WIDTH = terminal_width // 6
         MAX_DESC_WIDTH = terminal_width // 4
-        table = Table(title="Modules List", box=box.SIMPLE_HEAVY, expand=True)
+        table = Table(box=box.SIMPLE_HEAVY, expand=True)
 
 
         table.add_column("Module", style="bold white", width=MAX_MODULE_WIDTH,  overflow="fold", justify="left")
@@ -730,13 +729,16 @@ class LazyFramework:
                 prompt = f"lzf(\x1b[41m\x1b[97m{self.loaded_module.name}\x1b[0m)> " if self.loaded_module else "lzf> "
                 line = input(prompt)
             except (EOFError, KeyboardInterrupt):
-                console.print()
+                console.print("\n[bold green]Exiting Lazy Framework...[/bold green]")
+                console.print("[bold cyan]Thank you for using Lazy Framework. We hope to see you again soon![/bold cyan]")
                 break
             if not line.strip(): 
                 continue
             parts = shlex.split(line)
             cmd, args = parts[0], parts[1:]
             if cmd in ("exit", "quit"): 
+                console.print("\n[bold green]Exiting Lazy Framework...[/bold green]")
+                console.print("[bold cyan]Thank you for using Lazy Framework. We hope to see you again soon![/bold cyan]")
                 break
             getattr(self, f"cmd_{cmd}", lambda a: console.print("Unknown command", style="red"))(args)
 
@@ -748,14 +750,7 @@ def main():
     time.sleep(0.6)
     os.system("cls" if platform.system().lower() == "windows" else "clear")
     load_banners_from_folder()
-    try:
-        LazyFramework().repl()
-    except KeyboardInterrupt:
-        console.print("\n[bold green]Exiting Lazy Framework...[/bold green]")
-        console.print("[bold cyan]Thank you for using Lazy Framework. We hope to see you again soon![/bold cyan]")
-    except SystemExit:
-        console.print("\n[bold green]Exiting Lazy Framework...[/bold green]")
-        console.print("[bold cyan]Thank you for using Lazy Framework. We hope to see you again soon![/bold cyan]")
+    LazyFramework().repl()
 
 if __name__ == "__main__":
     main()
