@@ -1,0 +1,883 @@
+#!/usr/bin/env python3
+
+import os, sys, shlex, importlib.util, re, platform, time, random, itertools, threading, shutil, textwrap
+from pathlib import Path
+from dataclasses import dataclass, field
+from typing import Dict, Any, Optional, List
+
+# Use Rich for nicer terminal UI
+from rich.console import Console
+from rich.table import Table
+from rich.panel import Panel
+from rich.align import Align
+from rich import box
+
+console = Console()
+
+# Paths
+BASE_DIR = Path(__file__).parent
+MODULE_DIR, EXAMPLES_DIR, BANNER_DIR = BASE_DIR / "modules", BASE_DIR / "examples", BASE_DIR / "banner"
+METADATA_READ_LINES = 120
+_loaded_banners = []
+
+# ========== Banner Loader ==========
+def load_banners_from_folder():
+    global _loaded_banners
+    _loaded_banners = []
+    BANNER_DIR.mkdir(parents=True, exist_ok=True)
+    for p in sorted(BANNER_DIR.glob("*.txt")):
+        try:
+            text = p.read_text(encoding="utf-8", errors="ignore").rstrip()
+            if text:
+                _loaded_banners.append(text + "\n\n")
+        except Exception:
+            pass
+    if not _loaded_banners:
+        _loaded_banners = ["\n"]
+
+def colorize_banner(text):
+    colors = ['red', 'green', 'yellow', 'blue', 'magenta', 'cyan']
+    color = random.choice(colors)
+    return f"[{color}]{text}[/{color}]"
+
+def get_random_banner():
+    if not _loaded_banners:
+        load_banners_from_folder()
+
+    banner = random.choice(_loaded_banners).rstrip("\n")
+    try:
+        cols = shutil.get_terminal_size(fallback=(80, 24)).columns
+    except Exception:
+        cols = 80
+
+    lines = banner.splitlines()
+    max_len = max((len(line) for line in lines), default=0)
+    scale = min(1.0, cols / max_len) if max_len > 0 else 1.0
+
+    if scale < 1.0:
+        new_lines = [line[:int(cols)] for line in lines]
+    else:
+        new_lines = [line.center(cols) for line in lines]
+
+    return colorize_banner("\n".join(new_lines)) + "\n\n"
+
+# ========== One-line Animation ==========
+class SingleLineMarquee:
+    def __init__(self, text="Starting the Lazy Framework Console...",
+                 text_speed: float = 6.06, spinner_speed: float = 0.06):
+        self.text, self.spinner = text, itertools.cycle(['|', '/', '-', '\\'])
+        self.alt_text = ''.join(c.lower() if i % 2 == 0 else c.upper() for i, c in enumerate(text))
+        self.text_speed, self.spinner_speed = max(0.01, text_speed), max(0.01, spinner_speed)
+        self._stop, self._pos, self._thread = threading.Event(), 0, None
+
+    def _compose(self, pos, spin):
+        return f"{self.alt_text[:pos] + self.text[pos:]} [{spin}]"
+
+    def _run(self):
+        L = len(self.text)
+        last_time = time.time()
+        while not self._stop.is_set():
+            spin = next(self.spinner)
+            now = time.time()
+            if self._pos < L and (now - last_time) >= self.text_speed:
+                self._pos += 1
+                last_time = now
+            sys.stdout.write('\r' + self._compose(self._pos, spin))
+            sys.stdout.flush()
+            if self._pos >= L:
+                break
+            time.sleep(self.spinner_speed)
+        sys.stdout.write('\r' + self.text + '\n')
+        sys.stdout.flush()
+
+    def start(self):
+        if not (self._thread and self._thread.is_alive()):
+            self._thread = threading.Thread(target=self._run, daemon=True)
+            self._thread.start()
+    def wait(self):
+        if self._thread: self._thread.join()
+    def stop(self):
+        self._stop.set();
+        if self._thread: self._thread.join()
+
+# ========== Core Framework ==========
+@dataclass
+class ModuleInstance:
+    name: str
+    module: Any
+    options: Dict[str, Any] = field(default_factory=dict)
+    def set_option(self, key, value):
+        if key not in self.module.OPTIONS: raise KeyError(f"Unknown option '{key}'")
+        self.options[key] = value
+    def get_options(self):
+        if hasattr(self.module, "OPTIONS"):
+           return {k: {"value": self.options.get(k, v.get("default")), **v} for k, v in self.module.OPTIONS.items()}
+        else:
+           return {}
+
+    def run(self, session): return self.module.run(session, self.options)
+
+class Search:
+    def __init__(self, modules, metadata): self.modules, self.metadata = modules, metadata
+    def search_modules(self, keyword):
+        keyword = keyword.lower(); results = []
+        for key, meta in self.metadata.items():
+            if keyword in key.lower() or keyword in meta.get("description","").lower():
+                results.append((key, meta.get("description","(no description)")))
+        return results
+
+class LazyFramework:
+    def __init__(self):
+        self.modules, self.metadata = {}, {}
+        self.loaded_module: Optional[ModuleInstance] = None
+        self.session = {"user": os.getenv("USER", "unknown")}
+        self.scan_modules()
+        self.silent = True
+
+    def scan_modules(self):
+        #self._ensure_dirs()
+        #old_count = len(self.modules)
+        self.loaded_modules = []
+        self.modules.clear()
+        self.metadata.clear()
+        valid_extensions = [".py", ".cpp", ".c", ".rb", ".php"]
+
+        for folder, prefix in ((MODULE_DIR, "modules"),):
+            for p in folder.rglob("*"):
+                if p.is_dir():
+                    continue
+                if p.suffix not in valid_extensions:  # Hanya ekstensi yang valid yang di-load
+                    continue
+                # Abaikan file __init__.py karena itu bukan modul yang bisa di-use.
+                if p.name == "__init__.py":
+                    continue
+                if "__pycache__" in p.parts or p.suffix in ['.pyc', '.pyo']:
+                    continue
+                rel = str(p.relative_to(folder)).replace(os.sep, "/")
+                stem = p.stem
+                key = f"{prefix}/{rel[:-len(p.suffix)]}" if p.suffix else f"{prefix}/{rel}"
+                if key.endswith('.py'):
+                     key = key[:-3]
+                self.modules[key] = p
+                self.metadata[key] = self._read_meta(p)
+                self.load_module(key)
+
+    def load_module(self, module_key):
+        if module_key in self.modules:
+            try:
+                module_path = self.modules[module_key]
+                spec = importlib.util.spec_from_file_location(module_key, module_path)
+                mod = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(mod)
+                self.loaded_modules.append(module_key)
+                if not getattr(self, "silent", True):
+                   console.print(f"[green]Modul [bold]{module_key}[/bold] berhasil dimuat otomatis![/green]")
+            except Exception as e:
+                #console.print(f"[red]Error saat memuat modul {module_key}: {e}[/red]")
+                if not getattr(self, "silent", False):
+                   console.print(f"[red]Error saat memuat {module_key}: {e}[/red]")
+
+
+    def _read_meta(self, path):
+        data = {"description": "(No description available)", "options": [], "dependencies": []}
+        try:
+            text = "".join(path.open("r", encoding="utf-8", errors="ignore").readlines()[:METADATA_READ_LINES])
+            
+            # Baca MODULE_INFO
+            if (m_info := re.search(r"MODULE_INFO\s*=\s*{([^}]+)}", text, re.DOTALL)):
+                module_info_content = m_info.group(1)
+                if (m_desc := re.search(r"(?:'description'|\"description\")\s*:\s*['\"]([^'\"]+)['\"]", module_info_content)):
+                    data["description"] = m_desc.group(1).strip()
+            
+            # Baca dependencies dari MODULE_INFO
+            if (m_info := re.search(r"MODULE_INFO\s*=\s*{([^}]+)}", text, re.DOTALL)):
+                module_info_content = m_info.group(1)
+                if (m_deps := re.search(r"(?:'dependencies'|\"dependencies\")\s*:\s*\[([^\]]+)\]", module_info_content)):
+                    deps_str = m_deps.group(1)
+                    dependencies = re.findall(r"['\"]([^'\"]+)['\"]", deps_str)
+                    data["dependencies"] = [dep.strip() for dep in dependencies if dep.strip()]
+            
+            # Baca OPTIONS
+            if (mo := re.search(r"OPTIONS\s*=\s*{([^}]*)}", text, re.DOTALL)):
+                data["options"] = re.findall(r"['\"]([A-Za-z00_]+)['\"]\s*:", mo.group(1))
+                
+        except Exception as e: 
+             # Jika terjadi error saat membaca, gunakan deskripsi default.
+             pass
+        return data
+
+    def _check_dependencies(self, dependencies: List[str]) -> Dict[str, bool]:
+        """Check if dependencies are available with automatic package name resolution"""
+        results = {}
+        
+        for dep in dependencies:
+            # Clean the package name (remove version specifiers)
+            clean_dep = re.split(r'[><=!]', dep)[0].strip()
+            
+            # Generate possible import names
+            import_names = self._generate_import_names(clean_dep)
+            
+            success = False
+            for import_name in import_names:
+                try:
+                    importlib.import_module(import_name)
+                    results[dep] = True
+                    success = True
+                    break
+                except ImportError:
+                    continue
+            
+            if not success:
+                results[dep] = False
+        
+        return results
+
+    def _generate_import_names(self, package_name: str) -> List[str]:
+        """Generate possible import names for a package"""
+        names = []
+        
+        # Common package name mappings
+        package_mappings = {
+            'beautifulsoup4': ['bs4'],
+            'pillow': ['PIL', 'PIL.Image', 'PIL.ImageDraw'],
+            'pyyaml': ['yaml'],
+            'python-dateutil': ['dateutil'],
+            'scikit-learn': ['sklearn'],
+            'opencv-python': ['cv2'],
+            'mysql-connector-python': ['mysql.connector'],
+            'psycopg2-binary': ['psycopg2'],
+            'pymongo': ['pymongo'],
+            'requests': ['requests'],
+            'urllib3': ['urllib3'],
+            'selenium': ['selenium'],
+            'scapy': ['scapy'],
+            'cryptography': ['cryptography'],
+            'paramiko': ['paramiko'],
+            'numpy': ['numpy'],
+            'pandas': ['pandas'],
+            'matplotlib': ['matplotlib'],
+            'flask': ['flask'],
+            'django': ['django'],
+            'torch': ['torch'],
+            'tensorflow': ['tensorflow'],
+            'keras': ['keras'],
+            'pillow': ['PIL'],
+            'pyqt5': ['PyQt5'],
+            'pyside2': ['PySide2'],
+            'wxpython': ['wx'],
+            'pygame': ['pygame'],
+            'jinja2': ['jinja2'],
+            'markdown': ['markdown'],
+            'pygments': ['pygments'],
+            'lxml': ['lxml'],
+            'bs4': ['bs4'],
+            'feedparser': ['feedparser'],
+            'sqlalchemy': ['sqlalchemy'],
+            'alembic': ['alembic'],
+            'celery': ['celery'],
+            'redis': ['redis'],
+            'pika': ['pika'],
+            'kombu': ['kombu'],
+            'docker': ['docker'],
+            'fabric': ['fabric'],
+            'ansible': ['ansible'],
+            'salt': ['salt'],
+            'pytest': ['pytest'],
+            'unittest': ['unittest'],
+            'coverage': ['coverage'],
+            'black': ['black'],
+            'flake8': ['flake8'],
+            'mypy': ['mypy'],
+            'isort': ['isort'],
+            'pre-commit': ['pre_commit'],
+            'virtualenv': ['virtualenv'],
+            'pip': ['pip'],
+            'setuptools': ['setuptools'],
+            'wheel': ['wheel'],
+            'twine': ['twine'],
+        }
+        
+        # Add the original name
+        names.append(package_name)
+        
+        # Add underscore variations
+        if '-' in package_name:
+            names.append(package_name.replace('-', '_'))
+        if '.' in package_name:
+            names.append(package_name.replace('.', '_'))
+        
+        # Add common mappings
+        if package_name in package_mappings:
+            names.extend(package_mappings[package_name])
+        
+        # Try without "python-" prefix
+        if package_name.startswith('python-'):
+            names.append(package_name[7:])
+        
+        # Try without "py-" prefix  
+        if package_name.startswith('py-'):
+            names.append(package_name[3:])
+        
+        # Remove duplicates and return
+        return list(dict.fromkeys(names))
+
+    def import_module(self, key):
+        path = self.modules[key]
+        spec = importlib.util.spec_from_file_location(key.replace('/', '_'), path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+
+    # -------- Commands (Rich-powered) --------
+    def cmd_help(self, args):
+        """Responsive help (Rich table)."""
+        commands = [
+            ("show modules", "Show available modules"),
+            ("show payloads", "Show available payload modules"),  # TAMBAHAN BARU
+            ("payloads", "Show available payload modules"),
+            ("use <module>", "Load a module by name"),
+            ("info", "Show information about the current module"),
+            ("options", "Show options for current module"),
+            ("set <option> <value>", "Set module option"),
+            ("run", "Run current module"),
+            ("back", "Unload module"),
+            ("search <keyword>", "Search modules"),
+            ("scan", "Rescan modules"),
+            ("banner reload|list", "Reload/list banner files"),
+            ("cd <dir>", "Change working directory"),
+            ("ls", "List current directory"),
+            ("clear", "Clear terminal screen"),
+            ("exit / quit", "Exit the program"),
+        ]
+        table = Table(title="Core Commands", box=box.SIMPLE_HEAVY)
+        table.add_column("Command", style="bold white")
+        table.add_column("Description", style="white")
+        for cmd, desc in commands:
+            table.add_row(cmd, desc)
+        panel = Panel(table, title="", border_style="white", expand=True)
+        console.print(panel)
+
+    def cmd_pwd(self, args):
+        """Mengambil direktori kerja saat ini tanpa output apapun"""
+        # Direktori kerja disimpan dalam variabel, tapi tidak ada output
+        self.current_directory = os.getcwd()
+
+    def cmd_payloads(self, args):
+        """Show available payloads with detailed information (only under `modules/`)."""
+        # Filter hanya modul payload yang berada di dalam direktori 'modules/'
+        payload_modules = {}
+
+        for key, path in self.modules.items():
+            # Pastikan modul berasal dari 'modules/' root
+            if not key.startswith("modules/"):
+                continue
+
+            # Cek apakah salah satu segmen path mengindikasikan payload
+            parts = key.split('/')
+            if not (("payload" in parts) or ("payloads" in parts)):
+                continue
+
+            payload_modules[key] = self.metadata.get(key, {})
+
+        if not payload_modules:
+            console.print("No payload modules found under 'modules/'.", style="yellow")
+            return
+
+        # Create detailed table
+        table = Table(title="Available Payloads", box=box.SIMPLE_HEAVY, expand=True)
+        table.add_column("Payload", style="bold cyan", width=30)
+        table.add_column("Type", style="yellow", width=15)
+        table.add_column("Platform", style="green", width=12)
+        table.add_column("Arch", style="magenta", width=10)
+        table.add_column("Rank", style="red", width=8)
+        table.add_column("Description", style="white", min_width=20)
+
+        for key, meta in sorted(payload_modules.items()):
+            # Tampilkan path relatif tanpa prefix 'modules/'
+            display_name = key[len("modules/"):]
+
+            # Determine payload type heuristically from path/name
+            kl = key.lower()
+            payload_type = "unknown"
+            if "meterpreter" in kl:
+                payload_type = "meterpreter"
+            elif "shell" in kl:
+                payload_type = "shell"
+            elif "reverse" in kl:
+                payload_type = "reverse"
+            elif "bind" in kl:
+                payload_type = "bind"
+            elif "staged" in kl:
+                payload_type = "staged"
+            elif "stageless" in kl:
+                payload_type = "stageless"
+
+            # Get platform and architecture from metadata (fallbacks)
+            platform_info = meta.get("platform", "multi")
+            if isinstance(platform_info, str):
+                platform_info = platform_info.capitalize()
+            arch = meta.get("arch", "multi")
+
+            # Get rank and description
+            rank = meta.get("rank", "Normal")
+            description = meta.get("description", "No description available")
+
+            table.add_row(display_name, payload_type, str(platform_info), str(arch), str(rank), description)
+
+        # Additional payload statistics
+        total_payloads = len(payload_modules)
+        payload_types = {}
+        platforms = {}
+
+        for key in payload_modules.keys():
+            kl = key.lower()
+            # Count by platform
+            if "/windows/" in kl:
+                platforms["Windows"] = platforms.get("Windows", 0) + 1
+            elif "/linux/" in kl:
+                platforms["Linux"] = platforms.get("Linux", 0) + 1
+            elif "/android/" in kl:
+                platforms["Android"] = platforms.get("Android", 0) + 1
+            elif "/mac" in kl or "/osx" in kl:
+                platforms["macOS"] = platforms.get("macOS", 0) + 1
+            else:
+                platforms["Multi"] = platforms.get("Multi", 0) + 1
+
+            # Count by payload category
+            if "reverse" in kl:
+                payload_types["Reverse"] = payload_types.get("Reverse", 0) + 1
+            elif "bind" in kl:
+                payload_types["Bind"] = payload_types.get("Bind", 0) + 1
+            elif "meterpreter" in kl:
+                payload_types["Meterpreter"] = payload_types.get("Meterpreter", 0) + 1
+            elif "shell" in kl:
+                payload_types["Shell"] = payload_types.get("Shell", 0) + 1
+
+        # Display the main table
+        console.print(table)
+
+        # Display statistics
+        console.print(f"\n[bold]Payload Statistics:[/bold]")
+        console.print(f"  • Total Payloads: [cyan]{total_payloads}[/cyan]")
+
+        if payload_types:
+            type_stats = " | ".join([f"{k}: {v}" for k, v in payload_types.items()])
+            console.print(f"  • Types: {type_stats}")
+
+        if platforms:
+            platform_stats = " | ".join([f"{k}: {v}" for k, v in platforms.items()])
+            console.print(f"  • Platforms: {platform_stats}")
+
+        # Usage examples
+        console.print(f"\n[bold]Usage Examples:[/bold]")
+        console.print(f"  • [dim]use payload/linux/x64/shell_reverse_tcp[/dim]")
+        console.print(f"  • [dim]use payload/windows/meterpreter/reverse_tcp[/dim]")
+        console.print(f"  • [dim]set LHOST 192.168.1.100[/dim]")
+        console.print(f"  • [dim]set LPORT 4444[/dim]")
+        console.print(f"  • [dim]run[/dim]")
+
+    def cmd_show(self, args):
+        """Show available modules using Rich table inside a box."""
+        if not args:
+            console.print("Usage: show modules|payloads", style="red")
+            return
+        
+        subcommand = args[0].lower()
+        
+        if subcommand == "modules":
+            # Menentukan ukuran terminal untuk menyesuaikan ukuran tabel
+            terminal_width = shutil.get_terminal_size((80, 20)).columns
+            # Menentukan lebar kolom dengan mengatur properti terminal
+            MAX_MODULE_WIDTH = terminal_width // 4
+            MAX_RANK_WIDTH = terminal_width // 6
+            MAX_DESC_WIDTH = terminal_width // 4
+            table = Table(box=box.SIMPLE_HEAVY, expand=True)
+
+            table.add_column("Module", style="bold white", width=MAX_MODULE_WIDTH,  overflow="fold", justify="left")
+            table.add_column("Rank", style="bold yellow", width=MAX_RANK_WIDTH, justify="center")
+            table.add_column("Description", style="white", min_width=10, overflow="fold", justify="left")
+
+            for k, v in sorted(self.metadata.items()):
+                display_key = k.replace("modules/", "", 1) # Menghapus 'modules/' HANYA di awal
+                if "__pycache__" in display_key:
+                    match = re.search(r"/(.+?)\/__pycache__/", "/" + k)
+                    if match:
+                       display_key = re.sub(r"\/__pycache__\/.*$", "", display_key)
+                       display_key = re.sub(r"(\.cpython-\d+)?$", "", display_key)
+                if display_key.endswith('.py'):
+                    display_key = display_key[:-3]
+                meta = self.metadata.get(k, {}) or {}
+                rank = meta.get("rank", "Normal")  # Ambil rank dari metadata modul
+                desc = v.get("description", "(no description)")
+                # Membungkus deskripsi agar tidak terpotong
+                table.add_row(display_key, rank, desc)
+
+            panel = Panel(table, title="Modules List", border_style="white", expand=True)
+            console.print(panel)
+        
+        elif subcommand == "payloads":
+            # Panggil cmd_payloads dengan args kosong
+            self.cmd_payloads([])
+        
+        else:
+            console.print(f"Unknown show subcommand: {subcommand}", style="red")
+            console.print("Usage: show modules|payloads", style="yellow")
+
+    def cmd_use(self, args):
+        if not args:
+            console.print("Usage: use <module>", style="bold red")
+            return
+        
+        user_key = args[0].strip()
+        if user_key.lower().endswith('.py'):
+            user_key = user_key[:-3]
+
+        variations = [user_key, f"modules/{user_key}"]
+        if user_key.startswith('modules/'):
+            variations.insert(0, user_key)
+            variations.append(user_key[8:])
+
+        key = None
+        for variation in variations:
+            if variation in self.modules:
+                key = variation
+                break
+
+        if not key:
+            frag = user_key.split('/')[-1].lower()
+            candidates = []
+            for k in self.modules.keys():
+                module_name = k.split('/')[-1].lower()
+                if (frag == module_name or frag in k.lower() or k.lower().endswith('/' + frag)):
+                    candidates.append(k)
+            if candidates:
+                console.print(f"Module '{user_key}' not found. Did you mean:", style="yellow")
+                for c in candidates[:8]:
+                    console.print("  " + c)
+                return
+            else:
+                console.print(f"Module '{user_key}' not found.", style="red")
+                category = '/'.join(user_key.split('/')[:-1])
+                if category:
+                    console.print(f"Available modules in '{category}':")
+                    for k in sorted(self.modules.keys()):
+                        if k.startswith(category):
+                            console.print("  ", k)
+                return
+        path = self.modules[key]
+        try:
+            module_dir = path.parent
+            pycache_path = module_dir / "__pycache__"
+            #path = self.modules[key]
+            self._delete_pycache_folder(pycache_path, "Pre-cleanup")
+            spec = importlib.util.spec_from_file_location(key.replace('/', '_'), path)
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            time.sleep(0.01) 
+            self._delete_pycache_folder(pycache_path, "Post-cleanup")
+
+            # Check dependencies before loading
+            meta = getattr(mod, "MODULE_INFO", {})
+            dependencies = meta.get("dependencies", [])
+            if dependencies:
+                dep_results = self._check_dependencies(dependencies)
+                missing_deps = [dep for dep, available in dep_results.items() if not available]
+                if missing_deps:
+                    console.print(f"[yellow]Warning: Missing dependencies for module '{key}':[/yellow]")
+                    for dep in missing_deps:
+                        console.print(f"  [red]{dep}[/red] - not installed")
+                    console.print(f"\n[yellow]Install missing dependencies with: pip install {' '.join(missing_deps)}[/yellow]")
+
+            inst = ModuleInstance(key, mod)
+            for k, meta in getattr(mod, "OPTIONS", {}).items():
+                if "default" in meta:
+                    inst.options[k] = meta["default"]
+
+            self.loaded_module = inst
+            #self.loaded_module = None
+            console.print(Panel(f"Loaded module [bold]{key}[/bold]", style="green"))
+
+        except Exception as e:
+            console.print(f"Load error: {e}", style="bold red")
+
+    # Di dalam class LazyFramework
+    def _delete_pycache_folder(self, pycache_path: Path, action_name: str):
+        if pycache_path.is_dir():
+           try:
+               for item in pycache_path.iterdir():
+                   if item.is_file():
+                      os.unlink(item)
+               os.rmdir(pycache_path)
+               console.print(f"[dim]{action_name}: Removed __pycache__ at[/dim] {pycache_path.relative_to(BASE_DIR)}", style="dim green")
+               return True
+           except OSError as e:
+            # Risiko terbesar di Post-cleanup adalah file masih digunakan oleh Python
+               console.print(f"[dim red]Warning[/dim red]: {action_name} failed for {pycache_path}: {e}", style="dim")
+               return False
+        return False
+
+
+    def cmd_info(self, args):
+        """Display module information in Metasploit style"""
+        if not self.loaded_module:
+            console.print("No module loaded. Use 'use <module>' first.", style="red")
+            return
+            
+        mod = self.loaded_module.module
+        meta = getattr(mod, "MODULE_INFO", {}) or {}
+        
+        # Extract module information
+        name = meta.get("name", self.loaded_module.name.split('/')[-1])
+        mod_type = self._get_module_type_from_path(mod.__file__).upper()
+        authors = meta.get("author", meta.get("authors", "Unknown"))
+        description = meta.get("description", "No description provided.")
+        license_ = meta.get("license", "Unknown")
+        references = meta.get("references", [])
+        dependencies = meta.get("dependencies", [])
+        
+        # Check dependencies status
+        dep_status = {}
+        if dependencies:
+            dep_status = self._check_dependencies(dependencies)
+        
+        # Metasploit-style header
+        console.print(f"\n[bold white]       Name: [/bold white][bold cyan]{name}[/bold cyan]")
+        console.print(f"[bold white]     Module: [/bold white]{self.loaded_module.name}")
+        console.print(f"[bold white]       Type: [/bold white]{mod_type}")
+        console.print(f"[bold white]   Platform: [/bold white]{meta.get('platform', 'All')}")
+        console.print(f"[bold white]       Arch: [/bold white]{meta.get('arch', 'All')}")
+        console.print(f"[bold white]     Author: [/bold white]{authors}")
+        console.print(f"[bold white]    License: [/bold white]{license_}")
+        console.print(f"[bold white]       Rank: [/bold white]{meta.get('rank', 'Normal')}")
+        
+        # Description in a box (like Metasploit)
+        console.print(f"\n[bold white]Description:[/bold white]")
+        desc_lines = textwrap.fill(description, width=80)
+        console.print(Panel(desc_lines, border_style="blue", box=box.SQUARE))
+        
+        # Dependencies section
+        if dependencies:
+            console.print(f"\n[bold white]Dependencies:[/bold white]")
+            deps_table = Table(show_header=True, header_style="bold white", box=box.SIMPLE, show_edge=False)
+            deps_table.add_column("Package", style="white", width=25)
+            deps_table.add_column("Status", style="white", width=15)
+            deps_table.add_column("Action", style="white", width=30)
+            
+            for dep in dependencies:
+                status = dep_status.get(dep, False)
+                status_text = "[green]Available[/green]" if status else "[red]Missing[/red]"
+                action_text = "[green]Ready[/green]" if status else f"[yellow]pip install {dep}[/yellow]"
+                deps_table.add_row(dep, status_text, action_text)
+            
+            console.print(deps_table)
+        
+        # References
+        if references:
+            console.print(f"\n[bold white]References:[/bold white]")
+            for i, ref in enumerate(references, 1):
+                console.print(f"  [bold white]{i}.[/bold white] {ref}")
+        
+        # Options section (like Metasploit's Module options)
+        if hasattr(mod, "OPTIONS") and isinstance(getattr(mod, "OPTIONS"), dict):
+            opts = self.loaded_module.get_options()
+            if opts:
+                console.print(f"\n[bold yellow]Module options ({self.loaded_module.name}):[/bold yellow]")
+                console.print("")
+                
+                # Create table without borders for Metasploit style
+                table = Table(show_header=True, header_style="bold yellow", box=box.SIMPLE, show_edge=False)
+                table.add_column("Name", style="white", width=25, no_wrap=True)
+                table.add_column("Current", style="cyan", width=25, no_wrap=True)
+                table.add_column("Required", style="white", width=25, justify="center")
+                table.add_column("Description", style="white", width=30)
+                for name, info in opts.items():
+                    current = str(info.get('value', '')).strip()
+                    if not current:
+                        current = info.get('default', '')
+                    if not current:
+                        current = ""
+                    
+                    required = "yes" if info.get('required') else "no"
+                    desc = info.get('description', 'No description')
+                    
+                    table.add_row(name, current, required, desc)
+                
+                console.print(table)
+            else:
+                console.print(f"\n[bold yellow]This module has no options.[/bold yellow]")
+        else:
+            console.print(f"\n[bold yellow]This module has no options.[/bold yellow]")
+        
+        console.print("")  # Empty line at the end
+
+    def _get_module_type_from_path(self, module_file_path):
+        """
+        Tentukan tipe modul berdasarkan struktur folder dan nama file.
+        """
+        # Ambil nama folder dari jalur file
+        folder_name = os.path.basename(os.path.dirname(module_file_path))
+
+        # Tentukan tipe berdasarkan folder
+        if folder_name in ['scanner', 'auxiliary']:
+            return 'auxiliary'
+        elif folder_name in ['exploit']:
+            return 'exploit'
+        elif folder_name in ['post']:
+            return 'post'
+        elif folder_name in ['payload']:
+            return 'payload'
+        elif folder_name in ['encoder']:
+            return 'encoder'
+        else:
+            return 'auxiliary'
+
+    def cmd_options(self, args):
+        if not self.loaded_module:
+            console.print("No module loaded.", style="red")
+            return
+        if hasattr(self.loaded_module.module, "OPTIONS"):
+            table = Table(show_header=True, header_style="bold white", box=box.SIMPLE)
+            table.add_column("Name", width=30, no_wrap=True)
+            table.add_column("Current", justify="center", width=30)
+            table.add_column("Required", justify="center", width=15)
+            table.add_column("Description", width=50)
+            for k, v in self.loaded_module.get_options().items():
+                current_setting = str(v['value']) if 'value' in v else "Not Set"
+                required = "Yes" if v.get('required') else "No"
+                description = v.get('description', "No description available.")
+                table.add_row(k, current_setting, required, description)
+            panel = Panel(table, title="Module Options", border_style="white", expand=False)
+            console.print(panel)
+        else:
+            console.print(f"Module '{self.loaded_module.name}' has no configurable options.", style="yellow")
+
+    def cmd_set(self, args):
+        if not self.loaded_module: 
+            console.print("No module loaded.", style="red")
+            return
+        if len(args) < 2: 
+            console.print("Usage: set <option> <value>", style="red")
+            return
+        opt, val = args[0], " ".join(args[1:])
+        try:
+            self.loaded_module.set_option(opt, val)
+            console.print(f"{opt} => {val}", style="green")
+        except Exception as e:
+            console.print(str(e), style="red")
+
+    def cmd_run(self, args):
+        if not self.loaded_module: 
+            console.print("No module loaded.", style="red")
+            return
+        try: 
+            # Check dependencies before running
+            mod = self.loaded_module.module
+            meta = getattr(mod, "MODULE_INFO", {})
+            dependencies = meta.get("dependencies", [])
+            if dependencies:
+                dep_results = self._check_dependencies(dependencies)
+                missing_deps = [dep for dep, available in dep_results.items() if not available]
+                if missing_deps:
+                    console.print(f"[red]Error: Missing dependencies: {', '.join(missing_deps)}[/red]")
+                    console.print(f"[yellow]Install with: pip install {' '.join(missing_deps)}[/yellow]")
+                    return
+            
+            self.loaded_module.run(self.session)
+        except Exception as e: 
+            console.print(f"Run error: {e}", style="red")
+
+    def cmd_back(self, args):
+        if self.loaded_module: 
+            console.print(f"Unloaded {self.loaded_module.name}", style="yellow")
+            self.loaded_module = None
+        else: 
+            console.print("No module loaded.", style="red")
+
+    def cmd_scan(self, args):
+        self.scan_modules()
+        console.print(f"Scanned {len(self.modules)} modules.", style="green")
+
+    def cmd_search(self, args):
+        if not args:
+            return console.print("Usage: search <keyword>", style="red")
+        keyword = " ".join(args).strip()
+        results = Search(self.modules, self.metadata).search_modules(keyword)
+        if not results:
+            return console.print(f"No modules matching '{keyword}'", style="yellow")
+
+        table = Table(title=f"Search results for: {keyword}", box=box.SIMPLE)
+        table.add_column("Module", style="bold red", no_wrap=True)
+        table.add_column("Description")
+        for key, desc in sorted(results):
+            table.add_row(key, desc or "(no description)")
+
+        panel = Panel(table, title=f"{self.loaded_module}", border_style="white", expand=True)
+        console.print(panel)
+        console.print(f"{len(results)} result(s) found.")
+
+    def cmd_banner(self, args):
+        if not args: 
+            return console.print("Usage: banner reload|list", style="red")
+        if args[0] == "reload": 
+            load_banners_from_folder()
+            console.print(get_random_banner())
+        elif args[0] == "list":
+            files = [f.name for f in BANNER_DIR.glob("*.txt")]
+            if files:
+                for f in files: 
+                    console.print(f)
+            else:
+                console.print("No banner files.")
+
+    def cmd_cd(self, args):
+        if not args: 
+            return
+        try: 
+            os.chdir(args[0])
+            console.print("Changed Directory to: " + os.getcwd())
+        except Exception as e: 
+            console.print("Error: " + str(e), style="red")
+
+    def cmd_ls(self, args):
+        try:
+            for f in os.listdir(): 
+                console.print(f)
+        except Exception as e: 
+            console.print("Error: " + str(e), style="red")
+
+    def cmd_clear(self, args): 
+        os.system("cls" if platform.system().lower() == "windows" else "clear")
+
+    def repl(self):
+        console.print("Lazy Framework - type 'help' for commands", style="bold cyan")
+        console.print(get_random_banner())
+        while True:
+            try:
+                prompt = f"lzf(\x1b[41m\x1b[97m{self.loaded_module.name}\x1b[0m)> " if self.loaded_module else "lzf> "
+                line = input(prompt)
+            except (EOFError, KeyboardInterrupt):
+                console.print("\n[bold green]Exiting Lazy Framework...[/bold green]")
+                console.print("[bold cyan]Thank you for using Lazy Framework. We hope to see you again soon![/bold cyan]")
+                break
+            if not line.strip(): 
+                continue
+            parts = shlex.split(line)
+            cmd, args = parts[0], parts[1:]
+            if cmd in ("exit", "quit"): 
+                console.print("\n[bold green]Exiting Lazy Framework...[/bold green]")
+                console.print("[bold cyan]Thank you for using Lazy Framework. We hope to see you again soon![/bold cyan]")
+                break
+            getattr(self, f"cmd_{cmd}", lambda a: console.print("Unknown command", style="red"))(args)
+
+# ========== Main ==========
+def main():
+    anim = SingleLineMarquee("Starting the Lazy Framework Console...", 0.60, 0.06)
+    anim.start()
+    anim.wait()
+    time.sleep(0.6)
+    os.system("cls" if platform.system().lower() == "windows" else "clear")
+    load_banners_from_folder()
+    LazyFramework().repl()
+
+if __name__ == "__main__":
+    main()
