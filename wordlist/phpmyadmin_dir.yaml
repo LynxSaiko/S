@@ -1,0 +1,92 @@
+# phpmyadmin.yaml - Mega Super Comprehensive List for phpMyAdmin Path Fuzzing
+
+# ------------------------------
+# 1. PATHS UMUM DAN DEFAULT
+# ------------------------------
+- /phpmyadmin/
+- /phpMyAdmin/
+- /pma/
+- /PMA/
+- /admin/
+- /dbadmin/
+- /sqladmin/
+- /mysql/
+- /mysqladmin/
+- /webadmin/
+- /setup/
+- /database/
+- /php-my-admin/
+
+# ------------------------------
+# 2. PATHS DENGAN VERSI (2.x - 6.x)
+# ------------------------------
+# Versi 6.x
+- /phpmyadmin6/
+- /pma6/
+# Versi 5.x
+- /phpMyAdmin-5.2.1/
+- /phpMyAdmin-5.2/
+- /phpMyAdmin-5.1.3/
+- /phpMyAdmin-5.0.4/
+- /phpMyAdmin-5/
+- /pma5/
+# Versi 4.x
+- /phpMyAdmin-4.9.7/
+- /phpMyAdmin-4.8.5/
+- /phpMyAdmin-4.7.0/
+- /phpMyAdmin-4.6/
+- /phpMyAdmin-4/
+- /pma4/
+# Versi 3.x
+- /phpMyAdmin-3.5.8.2/
+- /phpMyAdmin-3.4/
+- /phpMyAdmin-3/
+- /pma3/
+# Versi 2.x
+- /phpMyAdmin-2.11.11.3/
+- /phpMyAdmin-2/
+- /pma2/
+
+# ------------------------------
+# 3. PATHS OBFUSCATED / CUSTOM ALIAS
+# ------------------------------
+- /phpMyAdmin-dev/
+- /php-admin/
+- /myadmin/
+- /sql/
+- /db/
+- /mysql-admin/
+- /db-admin/
+- /php-db/
+- /p-m-a/
+- /phpmy/
+
+# ------------------------------
+# 4. PATHS DENGAN SCRIPT/EKSTENSI
+# ------------------------------
+- /phpmyadmin/index.php
+- /phpmyadmin/main.php
+- /phpmyadmin/server_databases.php
+- /pma/index.php
+- /admin/index.php
+- /mysql/index.php
+
+# ------------------------------
+# 5. PATHS CMS SPECIFIC
+# ------------------------------
+# WordPress (sering diletakkan di subfolder WP)
+- /wordpress/phpmyadmin/
+- /wp-admin/phpmyadmin/
+# Joomla / Drupal (sering diletakkan di root atau subfolder)
+- /cms/phpmyadmin/
+- /joomla/phpmyadmin/
+- /drupal/phpmyadmin/
+
+# ------------------------------
+# 6. PATHS DENGAN ANGKA TAHUN
+# ------------------------------
+- /pma2023/
+- /pma2024/
+- /admin2023/
+- /admin2024/
+- /mysql2024/

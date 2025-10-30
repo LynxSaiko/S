@@ -9,6 +9,14 @@ from queue import Queue
 import re
 import urllib.parse
 
+# TAMBAH: Import pustaka YAML
+try:
+    import yaml
+    YAML_AVAILABLE = True
+except ImportError:
+    YAML_AVAILABLE = False
+
+
 # Suppress SSL warnings
 try:
     from urllib3.exceptions import InsecureRequestWarning
@@ -45,7 +53,7 @@ except ImportError:
 
 MODULE_INFO = {
     "name": "bruteforce/phpmyadmin_ultrafast",
-    "description": "Ultra fast phpMyAdmin bruteforce dengan progress bar yang tepat",
+    "description": "Ultra fast phpMyAdmin bruteforce dengan progress bar yang tepat", # <--- PERBAIKAN: Koma ditambahkan di sini
     "category": "auxiliary"
 }
 
@@ -102,7 +110,7 @@ OPTIONS = {
     },
     "CUSTOM": {
         "required": False,
-        "default": "phpmyadmin_dir.txt",
+        "default": "phpmyadmin_dir.yaml", # PERBAIKAN: Default diubah ke .yaml
         "description": "Custom paths to add to the scan (comma separated list, e.g., '/admin,/custompath1')"
     }
 }
@@ -152,13 +160,9 @@ class UltraFastTargetScanner:
         base_domain = parsed.netloc
         base_path = parsed.path
         
-        # Ekstrak bagian dari domain untuk pattern
-        #domain_parts = base_domain.split('.')
-        #domain_name = domain_parts[0] if domain_parts and domain_parts[0] not in ['www', 'http', 'https'] else "admin"
-        
         # Extended phpMyAdmin paths dengan versi terbaru
         # Load common and custom paths from a file
-        all_paths = self.load_paths_from_file("modules/phpmyadmin/wordlist/phpmyadmin.txt")
+        all_paths = self.load_paths_from_file("/data/data/com.termux/files/home/S/modules/phpmyadmin/wordlist/phpmyadmin_dir.yaml") # PERBAIKAN: Load .yaml
         all_paths.extend(self.custom_paths)
         # Remove duplicates and empty strings, then return
         unique_paths = list(dict.fromkeys([p for p in all_paths if p is not None]))
@@ -180,15 +184,39 @@ class UltraFastTargetScanner:
         return False
     
     def load_paths_from_file(self, filepath):
-        """Load paths (both common and custom) from a text file"""
-        try:
-           with open(filepath, 'r', encoding='utf-8') as file:
-                paths = [line.strip() for line in file.readlines() if line.strip()]
+        """
+        PERBAIKAN: Load paths (both common and custom) dari file teks ATAU file YAML.
+        """
+        if YAML_AVAILABLE and filepath.lower().endswith(('.yml', '.yaml')):
+            try:
+                # Memuat dari file YAML
+                with open(filepath, 'r', encoding='utf-8') as file:
+                    data = yaml.safe_load(file)
+                    
+                    if isinstance(data, list):
+                        return [str(p).strip() for p in data if p is not None and str(p).strip()]
+                    else:
+                        # Jika file YAML tidak berisi list, kembalikan list kosong
+                        print(f"[!] Error: YAML file '{filepath}' did not contain a list.")
+                        return []
+            except FileNotFoundError:
+                print(f"[!] Error: YAML file not found at '{filepath}'.")
+                return []
+            except Exception as e:
+                print(f"[!] Error parsing YAML file '{filepath}': {e}.")
+                return []
 
-           return paths
-        except Exception as e:
-           print(f"Error loading paths from file: {e}")
-           return []
+        else:
+            # Pemuatan default untuk file teks (.txt) atau jika YAML tidak tersedia/digunakan
+            try:
+               with open(filepath, 'r', encoding='utf-8') as file:
+                    paths = [line.strip() for line in file.readlines() if line.strip()]
+
+               return paths
+            except Exception as e:
+               # Jika file .yaml tidak ditemukan dan pemuatan .txt/lainnya gagal
+               print(f"Error loading paths from file: {e}")
+               return []
 
     def scan_paths(self):
         """Scan path dengan common paths yang digenerate dari URL"""
@@ -316,11 +344,12 @@ class UltraFastTargetScanner:
     def check_url_status(self, url):
         """Check status URL dengan version detection yang lebih baik"""
         try:
+            # Naikkan timeout dari 5 ke 8 detik
             response = requests.get(
                 url,
                 headers=self.headers,
                 verify=self.ssl_verify,
-                timeout=5,
+                timeout=8,
                 proxies=self.proxies,
                 allow_redirects=True
             )
@@ -444,7 +473,9 @@ class UltraFastTargetScanner:
             version = result.get("version", "Unknown")
             
             # Extract path from URL
-            path = "/" + result['url'].split('/', 3)[-1] if '/' in result['url'].split('//', 1)[-1] else "/"
+            # Menggunakan urllib.parse untuk akurasi yang lebih baik
+            parsed_url = urllib.parse.urlparse(result['url'])
+            path = parsed_url.path
             
             version_display = version
             if version != "Unknown":
@@ -610,6 +641,21 @@ class UltraFastPhpMyAdminBruteforce:
     
     def run(self):
         """Main execution"""
+        display_header()
+        
+        # Cek ketersediaan YAML
+        if (self.options.get("CUSTOM", "").lower().endswith(('.yml', '.yaml')) and not YAML_AVAILABLE):
+            if RICH_AVAILABLE:
+                console.print(Panel(
+                    "⚠️ [bold yellow]YAML Support Required[/bold yellow]\n"
+                    "Anda menggunakan file YAML, tetapi pustaka 'PyYAML' ('pip install pyyaml') tidak ditemukan. "
+                    "Pemuatan paths mungkin gagal.",
+                    border_style="yellow",
+                    padding=(1, 2)
+                ))
+            else:
+                print("[!] Peringatan: Pustaka 'PyYAML' tidak ditemukan. Pemuatan paths YAML mungkin gagal.")
+        
         # Phase 1: Fast Target Scanning
         found_paths = self.target_scanner.scan_paths()
         if not found_paths:
