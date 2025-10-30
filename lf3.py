@@ -261,6 +261,7 @@ class LazyFramework:
             'keras': ['keras'],
             'pillow': ['PIL'],
             'pyqt5': ['PyQt5'],
+            'pycryptodome': ['pycryptodome'],
             'pyside2': ['PySide2'],
             'wxpython': ['wx'],
             'pygame': ['pygame'],
@@ -286,6 +287,7 @@ class LazyFramework:
             'black': ['black'],
             'flake8': ['flake8'],
             'mypy': ['mypy'],
+            'pyinstaller': ['pyinstaller'],
             'isort': ['isort'],
             'pre-commit': ['pre_commit'],
             'virtualenv': ['virtualenv'],
@@ -320,158 +322,9 @@ class LazyFramework:
         spec.loader.exec_module(mod)
         return mod
 
-    # ========== MULTI HANDLER COMMAND ==========
-    def cmd_multi(self, args):
-        """Multi handler command for payload modules"""
-        if not args:
-            console.print("Usage: multi <payload_type> [LHOST=<ip>] [LPORT=<port>] [options]", style="red")
-            console.print("\nExamples:", style="yellow")
-            console.print("  multi reverse_tcp LHOST=0.0.0.0 LPORT=4444")
-            console.print("  multi bind_tcp LPORT=5555")
-            console.print("  multi meterpreter/reverse_tcp LHOST=192.168.1.100 LPORT=8080")
-            console.print("  multi linux/x64/shell_reverse_tcp LHOST=0.0.0.0 LPORT=4444")
-            console.print("\nAvailable payload types:", style="cyan")
-            self._show_available_payload_types()
-            return
-        
-        payload_type = args[0].lower()
-        options = {}
-        
-        # Parse additional options
-        for arg in args[1:]:
-            if '=' in arg:
-                key, value = arg.split('=', 1)
-                options[key.upper()] = value
-            else:
-                console.print(f"[yellow]Warning: Ignoring invalid option '{arg}'[/yellow]")
-        
-        # Set default options if not provided
-        if 'LHOST' not in options:
-            options['LHOST'] = '0.0.0.0'
-        if 'LPORT' not in options:
-            options['LPORT'] = '4444'
-        
-        self._start_multi_handler(payload_type, options)
-
-    def _start_multi_handler(self, payload_type, options):
-        """Start multi handler for specific payload type"""
-        # Check if handler is already running
-        if self.multi_handler.running:
-            console.print("[red]Multi handler is already running![/red]")
-            console.print("[yellow]Use 'multi stop' to stop current handler[/yellow]")
-            return
-        
-        # Special command: stop handler
-        if payload_type == 'stop':
-            self.multi_handler.stop_handler()
-            return
-        
-        # Special command: show sessions
-        if payload_type == 'sessions':
-            self._show_active_sessions()
-            return
-        
-        # Find matching payload modules
-        matching_payloads = self._find_payloads_by_type(payload_type)
-        
-        if not matching_payloads:
-            console.print(f"[red]No payload modules found for type: {payload_type}[/red]")
-            console.print("[yellow]Available payload types:[/yellow]")
-            self._show_available_payload_types()
-            return
-        
-        if len(matching_payloads) > 1:
-            console.print(f"[yellow]Multiple payloads found for '{payload_type}'. Using: {matching_payloads[0]}[/yellow]")
-        
-        payload_key = matching_payloads[0]
-        
-        try:
-            lhost = options['LHOST']
-            lport = int(options['LPORT'])
+    
             
-            # Start handler in background thread
-            handler_thread = threading.Thread(
-                target=self.multi_handler.start_handler,
-                args=(lhost, lport, payload_type),
-                daemon=True
-            )
-            handler_thread.start()
-            
-            console.print(f"[green]Multi handler started in background[/green]")
-            console.print(f"[white]Use 'multi sessions' to view active sessions[/white]")
-            console.print(f"[white]Use 'multi stop' to stop handler[/white]")
-            
-        except Exception as e:
-            console.print(f"[red]Error starting multi handler: {e}[/red]")
-
-    def _find_payloads_by_type(self, payload_type):
-        """Find payload modules matching the type"""
-        matching_payloads = []
         
-        for key in self.modules.keys():
-            if not key.startswith("modules/payload"):
-                continue
-            
-            # Check if payload type matches
-            payload_name = key.lower().replace("modules/payload/", "")
-            if (payload_type in payload_name or 
-                any(part in payload_type for part in payload_name.split('/'))):
-                matching_payloads.append(key)
-        
-        return sorted(matching_payloads)
-
-    def _show_available_payload_types(self):
-        """Show available payload types"""
-        payload_categories = {}
-        
-        for key in self.modules.keys():
-            if not key.startswith("modules/payload"):
-                continue
-            
-            # Extract category from payload path
-            parts = key.replace("modules/payload/", "").split('/')
-            if len(parts) >= 1:
-                category = parts[0]
-                if category not in payload_categories:
-                    payload_categories[category] = []
-                
-                display_name = key.replace("modules/payload/", "")
-                payload_categories[category].append(display_name)
-        
-        for category, payloads in sorted(payload_categories.items()):
-            console.print(f"  [cyan]{category}:[/cyan]")
-            for payload in payloads[:3]:  # Show first 3 examples
-                console.print(f"    - {payload}")
-            if len(payloads) > 3:
-                console.print(f"    - ... and {len(payloads) - 3} more")
-
-    def _show_active_sessions(self):
-        """Show active multi handler sessions"""
-        if not self.multi_handler.sessions:
-            console.print("[yellow]No active sessions[/yellow]")
-            return
-        
-        table = Table(title="Active Multi Handler Sessions", box=box.SIMPLE_HEAVY)
-        table.add_column("ID", style="bold cyan")
-        table.add_column("Address", style="green")
-        table.add_column("Payload", style="yellow")
-        table.add_column("Uptime", style="white")
-        table.add_column("Status", style="white")
-        
-        current_time = time.time()
-        with self.multi_handler.lock:
-            for session_id, session in self.multi_handler.sessions.items():
-                uptime = current_time - session.start_time
-                table.add_row(
-                    str(session_id),
-                    f"{session.address[0]}:{session.address[1]}",
-                    session.payload_type,
-                    f"{uptime:.1f}s",
-                    "Active" if session.active else "Closed"
-                )
-        
-        console.print(table)
-
     # -------- Existing Commands (Rich-powered) --------
     def cmd_help(self, args):
         """Responsive help (Rich table)."""
