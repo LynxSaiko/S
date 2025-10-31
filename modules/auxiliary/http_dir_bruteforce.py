@@ -21,11 +21,11 @@ console = Console()
 
 MODULE_INFO = {
     "name": "Directory Brute Force",
-    "description": "High-speed directory and file discovery",
-    "author": "Lazy Framework",
+    "description": "High-speed directory and file discovery with TQDM progress",
+    "author": "Lazy Framework Team",
     "license": "MIT",
     "platform": "Multi",
-    "rank": "Normal",
+    "rank": "Excellent",
     "dependencies": ["requests", "pyyaml", "rich", "tqdm"]
 }
 
@@ -104,13 +104,13 @@ def run(session, options):
             
     except FileNotFoundError:
         console.print(Panel(
-            f"[red]ERROR: Wordlist not found[/red]\n{wordlist_path}",
+            f"[red]❌ ERROR: Wordlist not found[/red]\n{wordlist_path}",
             border_style="red"
         ))
         return
     except Exception as e:
         console.print(Panel(
-            f"[red]ERROR: Failed to load wordlist[/red]\n{str(e)}",
+            f"[red]❌ ERROR: Failed to load wordlist[/red]\n{str(e)}",
             border_style="red"
         ))
         return
