@@ -21,7 +21,7 @@ console = Console()
 
 MODULE_INFO = {
     "name": "Directory Brute Force",
-    "description": "High-speed directory and file discovery with TQDM progress",
+    "description": "High-speed directory and file discovery",
     "author": "Lazy Framework",
     "license": "MIT",
     "platform": "Multi",
