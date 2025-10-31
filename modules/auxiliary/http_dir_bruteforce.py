@@ -22,10 +22,10 @@ console = Console()
 MODULE_INFO = {
     "name": "Directory Brute Force",
     "description": "High-speed directory and file discovery with TQDM progress",
-    "author": "Lazy Framework Team",
+    "author": "Lazy Framework",
     "license": "MIT",
     "platform": "Multi",
-    "rank": "Excellent",
+    "rank": "Normal",
     "dependencies": ["requests", "pyyaml", "rich", "tqdm"]
 }
 
@@ -70,7 +70,7 @@ def run(session, options):
     # Validate target
     if not target:
         console.print(Panel(
-            "[red]❌ ERROR: TARGET is required[/red]\n\n"
+            "[red]ERROR: TARGET is required[/red]\n\n"
             "[yellow]Usage:[/yellow]\n"
             "  set TARGET https://example.com\n"
             "  set WORDLIST path/to/wordlist.yaml\n"
@@ -82,7 +82,7 @@ def run(session, options):
         
     if not target.startswith(('http://', 'https://')):
         console.print(Panel(
-            "[red]❌ ERROR: Invalid target URL[/red]\n"
+            "[red]ERROR: Invalid target URL[/red]\n"
             "URL must start with http:// or https://",
             title="Configuration Error", 
             border_style="red"
@@ -97,20 +97,20 @@ def run(session, options):
         
         if not directories:
             console.print(Panel(
-                "[red]❌ ERROR: Wordlist is empty[/red]",
+                "[red]ERROR: Wordlist is empty[/red]",
                 border_style="red"
             ))
             return
             
     except FileNotFoundError:
         console.print(Panel(
-            f"[red]❌ ERROR: Wordlist not found[/red]\n{wordlist_path}",
+            f"[red]ERROR: Wordlist not found[/red]\n{wordlist_path}",
             border_style="red"
         ))
         return
     except Exception as e:
         console.print(Panel(
-            f"[red]❌ ERROR: Failed to load wordlist[/red]\n{str(e)}",
+            f"[red]ERROR: Failed to load wordlist[/red]\n{str(e)}",
             border_style="red"
         ))
         return
