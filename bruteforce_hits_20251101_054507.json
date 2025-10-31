@@ -1,0 +1,74 @@
+[
+  {
+    "path": "wp-includes/",
+    "url": "https://sman1dramaga.sch.id/wp-includes/",
+    "status": 403,
+    "size": 1242,
+    "language": "Unknown",
+    "title": ""
+  },
+  {
+    "path": "phpmyadmin/",
+    "url": "https://sman1dramaga.sch.id/phpmyadmin/",
+    "status": 403,
+    "size": 56,
+    "language": "PHP",
+    "title": ""
+  },
+  {
+    "path": "pma/",
+    "url": "https://sman1dramaga.sch.id/pma/",
+    "status": 403,
+    "size": 56,
+    "language": "Unknown",
+    "title": ""
+  },
+  {
+    "path": "wp-content/",
+    "url": "https://sman1dramaga.sch.id/wp-content/",
+    "status": 200,
+    "size": 0,
+    "language": "WordPress",
+    "title": ""
+  },
+  {
+    "path": ".htaccess",
+    "url": "https://sman1dramaga.sch.id/.htaccess",
+    "status": 403,
+    "size": 1242,
+    "language": "Unknown",
+    "title": ""
+  },
+  {
+    "path": "cgi-bin/",
+    "url": "https://sman1dramaga.sch.id/cgi-bin/",
+    "status": 403,
+    "size": 1242,
+    "language": "Unknown",
+    "title": ""
+  },
+  {
+    "path": ".git/",
+    "url": "https://sman1dramaga.sch.id/.git/",
+    "status": 403,
+    "size": 1242,
+    "language": "Unknown",
+    "title": ""
+  },
+  {
+    "path": ".git/HEAD",
+    "url": "https://sman1dramaga.sch.id/.git/HEAD",
+    "status": 403,
+    "size": 1242,
+    "language": "Unknown",
+    "title": ""
+  },
+  {
+    "path": ".htaccess",
+    "url": "https://sman1dramaga.sch.id/.htaccess",
+    "status": 403,
+    "size": 1242,
+    "language": "Unknown",
+    "title": ""
+  }
+]

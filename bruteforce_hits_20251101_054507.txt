@@ -1,0 +1,41 @@
+Target: https://sman1dramaga.sch.id
+Time: 2025-11-01 05:45:07.455059
+Hits: 9
+================================================================================
+
+[403] wp-includes/
+    URL: https://sman1dramaga.sch.id/wp-includes/
+    Size: 1242 | Lang: Unknown
+
+[403] phpmyadmin/
+    URL: https://sman1dramaga.sch.id/phpmyadmin/
+    Size: 56 | Lang: PHP
+
+[403] pma/
+    URL: https://sman1dramaga.sch.id/pma/
+    Size: 56 | Lang: Unknown
+
+[200] wp-content/
+    URL: https://sman1dramaga.sch.id/wp-content/
+    Size: 0 | Lang: WordPress
+
+[403] .htaccess
+    URL: https://sman1dramaga.sch.id/.htaccess
+    Size: 1242 | Lang: Unknown
+
+[403] cgi-bin/
+    URL: https://sman1dramaga.sch.id/cgi-bin/
+    Size: 1242 | Lang: Unknown
+
+[403] .git/
+    URL: https://sman1dramaga.sch.id/.git/
+    Size: 1242 | Lang: Unknown
+
+[403] .git/HEAD
+    URL: https://sman1dramaga.sch.id/.git/HEAD
+    Size: 1242 | Lang: Unknown
+
+[403] .htaccess
+    URL: https://sman1dramaga.sch.id/.htaccess
+    Size: 1242 | Lang: Unknown
+

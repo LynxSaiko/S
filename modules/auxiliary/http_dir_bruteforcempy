@@ -1,0 +1,265 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+import os
+import yaml
+import requests
+import threading
+import signal
+import json
+import re
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime
+from rich.console import Console
+from rich.table import Table
+from rich.progress import Progress, BarColumn, TextColumn, TimeRemainingColumn
+
+console = Console()
+shutdown_event = threading.Event()
+
+# === Ctrl+C Handler ===
+def signal_handler(sig, frame):
+    console.print("\n[yellow][!] Ctrl+C detected! Stopping gracefully...[/]")
+    shutdown_event.set()
+
+signal.signal(signal.SIGINT, signal_handler)
+
+# =============================================
+# WAJIB: MODULE_INFO + OPTIONS + run(session, options)
+# =============================================
+MODULE_INFO = {
+    "name": "HTTP Directory Brute Force",
+    "description": "Brute force directories and files with mega wordlist",
+    "author": "Grok",
+    "rank": "Excellent",
+    "dependencies": ["requests", "pyyaml", "rich"]
+}
+
+OPTIONS = {
+    "TARGET": {
+        "description": "Target URL (http:// or https://)",
+        "required": True,
+        "default": ""
+    },
+    "WORDLIST": {
+        "description": "Path to wordlist YAML",
+        "required": True,
+        "default": "examples/wordlist_mega_ultimate.yaml"
+    },
+    "THREADS": {
+        "description": "Number of threads",
+        "required": False,
+        "default": 30
+    },
+    "TIMEOUT": {
+        "description": "Request timeout in seconds",
+        "required": False,
+        "default": 10
+    },
+    "SUCCESS_CODES": {
+        "description": "Status codes to show (comma-separated)",
+        "required": False,
+        "default": "200,301,302,403,401"
+    },
+    "SHOW_404": {
+        "description": "Show 404 responses",
+        "required": False,
+        "default": "false"
+    }
+}
+
+def run(session, options):
+    global shutdown_event
+    shutdown_event.clear()
+    hits = []
+
+    # === AMBIL OPTIONS ===
+    target = options.get("TARGET", "").strip().rstrip("/")
+    wordlist = options.get("WORDLIST", "").strip()
+    threads = int(options.get("THREADS", 30))
+    timeout = int(options.get("TIMEOUT", 10))
+    success_codes = [int(x.strip()) for x in options.get("SUCCESS_CODES", "200,301,302,403,401").split(",") if x.strip()]
+    show_404 = options.get("SHOW_404", "false").lower() == "true"
+
+    # === VALIDASI ===
+    if not target:
+        console.print("[red]Error: TARGET is required. Use: set TARGET https://example.com[/]")
+        return
+    if not target.startswith(('http://', 'https://')):
+        console.print("[red]Error: TARGET must start with http:// or https://[/]")
+        return
+    if not wordlist:
+        console.print("[red]Error: WORDLIST is required.[/]")
+        return
+
+    # === LOAD WORDLIST ===
+    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+    full_path = os.path.join(base_dir, wordlist)
+    if not os.path.isfile(full_path):
+        console.print(f"[red]Error: WORDLIST not found: {full_path}[/]")
+        return
+
+    try:
+        with open(full_path, 'r', encoding='utf-8') as f:
+            data = yaml.safe_load(f) or {}
+            paths = [p.strip().lstrip('/') for p in data.get('paths', []) if p.strip()]
+        console.print(f"[green][*] Loaded {len(paths):,} paths from {wordlist}[/]")
+    except Exception as e:
+        console.print(f"[red]Error loading wordlist: {e}[/]")
+        return
+
+    if not paths:
+        console.print("[yellow]Wordlist is empty.[/]")
+        return
+
+    # === DETEKSI BAHASA ===
+    def detect_language(content="", url="", headers=None):
+        content = (content or "").lower()
+        url = url.lower()
+        checks = {
+            "PHP": ["php", "laravel", "codeigniter", "symfony"],
+            "Python": ["django", "flask", "fastapi"],
+            "Node.js": ["node", "express", "react", "next"],
+            "WordPress": ["wp-content", "wp-admin", "wordpress"],
+            "Joomla": ["joomla"],
+            "Drupal": ["drupal"],
+            "Ruby": ["rails"],
+            "Java": ["spring", "jsp"],
+            ".NET": [".net", "aspx"],
+            "Go": ["go", "gin"]
+        }
+        for lang, keywords in checks.items():
+            if any(k in content or k in url for k in keywords):
+                return lang
+        return "Unknown"
+
+    def get_title(html):
+        if not html: return ""
+        match = re.search(r'<title>(.*?)</title>', html, re.I | re.S)
+        title = match.group(1).strip() if match else ""
+        return (title[:60] + "...") if len(title) > 60 else title
+
+    def color_lang(lang):
+        colors = {
+            "PHP": "yellow", "Python": "blue", "Node.js": "green",
+            "WordPress": "bright_magenta", "Joomla": "red", "Drupal": "cyan"
+        }
+        return colors.get(lang, "dim")
+
+    # === WORKER ===
+    def worker(path):
+        if shutdown_event.is_set():
+            return None
+        url = f"{target}/{path}".replace("//", "/")
+        try:
+            r = requests.head(url, timeout=timeout, allow_redirects=True, verify=False, headers={'User-Agent': 'Mozilla/5.0'})
+            if r.status_code in [405, 501]:
+                r = requests.get(url, timeout=timeout, allow_redirects=True, verify=False, stream=True)
+                content = r.text[:1024] if r.status_code == 200 else ""
+            else:
+                content = r.text[:1024] if r.status_code == 200 else ""
+
+            size = len(r.content) if hasattr(r, 'content') else 0
+            lang = detect_language(content, url, r.headers)
+
+            if r.status_code in success_codes or (show_404 and r.status_code == 404):
+                full_url = r.url
+                title = get_title(content) if r.status_code == 200 else ""
+                hit = {
+                    "path": path,
+                    "url": full_url,
+                    "status": r.status_code,
+                    "size": size,
+                    "language": lang,
+                    "title": title
+                }
+                hits.append(hit)
+
+                status_color = {200: "green", 301: "cyan", 302: "cyan", 403: "red", 401: "red"}.get(r.status_code, "white")
+                size_str = str(size) if size > 0 else "—"
+                console.print(f"[{status_color}]{r.status_code}[/] {size_str:>8}  [{color_lang(lang)}]{lang}[/]    {path}")
+                if r.status_code == 200:
+                    console.print(f"   URL: [bold cyan]{full_url}[/]")
+                    if title:
+                        console.print(f"   Title: [dim]{title}[/]")
+                return hit
+        except:
+            pass
+        return None
+
+    # === JALANKAN BRUTE FORCE ===
+    console.print(f"[bold blue][*] Starting brute force on {target}[/]")
+    console.print(f"[dim]Threads: {threads} | Timeout: {timeout}s | Codes: {success_codes}[/]")
+
+    with Progress(
+        TextColumn("[bold blue]Bruting:"),
+        BarColumn(),
+        "[progress.percentage]{task.percentage:>3.0f}%",
+        TimeRemainingColumn()
+    ) as progress:
+        task = progress.add_task("brute", total=len(paths))
+        try:
+            with ThreadPoolExecutor(max_workers=threads) as executor:
+                futures = {executor.submit(worker, p): p for p in paths}
+                for future in as_completed(futures):
+                    if shutdown_event.is_set():
+                        console.print("[yellow][!] Stopping remaining tasks...[/]")
+                        break
+                    future.result()
+                    progress.update(task, advance=1)
+        except KeyboardInterrupt:
+            shutdown_event.set()
+            console.print("\n[yellow][!] Stopped by user.[/]")
+
+    # === HASIL AKHIR ===
+    if hits:
+        console.print(f"\n[bold green][+] {len(hits)} hits found![/]")
+        table = Table(title="Brute Force Results")
+        table.add_column("Status", style="bold")
+        table.add_column("Size")
+        table.add_column("Lang")
+        table.add_column("Path")
+        table.add_column("URL", style="cyan")
+        for h in hits:
+            sc = {200: "green", 301: "cyan", 403: "red", 401: "red"}.get(h['status'], "white")
+            table.add_row(
+                f"[{sc}]{h['status']}[/]",
+                str(h['size']) if h['size'] else "—",
+                f"[{color_lang(h['language'])}]{h['language']}[/]",
+                h['path'],
+                h['url']
+            )
+        console.print(table)
+
+        # === AUTO SAVE ===
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"bruteforce_hits_{timestamp}"
+        txt_file = f"{filename}.txt"
+        json_file = f"{filename}.json"
+
+        try:
+            with open(txt_file, 'w', encoding='utf-8') as f:
+                f.write(f"Target: {target}\nTime: {datetime.now()}\nHits: {len(hits)}\n{'='*80}\n\n")
+                for h in hits:
+                    f.write(f"[{h['status']}] {h['path']}\n    URL: {h['url']}\n")
+                    if h['title']: f.write(f"    Title: {h['title']}\n")
+                    f.write(f"    Size: {h['size']} | Lang: {h['language']}\n\n")
+            console.print(f"[green][+] Saved → {txt_file}[/]")
+        except Exception as e:
+            console.print(f"[red]Save failed: {e}[/]")
+
+        try:
+            with open(json_file, 'w', encoding='utf-8') as f:
+                json.dump(hits, f, indent=2)
+            console.print(f"[green][+] JSON → {json_file}[/]")
+        except:
+            pass
+
+        # Simpan session
+        try:
+            with open("bruteforce_hits.json", 'w') as f:
+                json.dump(hits, f, indent=2)
+        except:
+            pass
+    else:
+        console.print(f"\n[yellow][!] No results found. Scanned {len(paths):,} paths.[/]")

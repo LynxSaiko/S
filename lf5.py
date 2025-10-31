@@ -123,12 +123,13 @@ class LazyFramework:
         self.loaded_module: Optional[ModuleInstance] = None
         self.session = {"user": os.getenv("USER", "unknown")}
         self.scan_modules()
-        self.silent = True
+        
 
     # SCAN HANYA BACA METADATA — TIDAK IMPORT!
     def scan_modules(self):
         self.modules.clear()
         self.metadata.clear()
+        self.auto_run_modules()
         valid_extensions = [".py", ".cpp", ".c", ".rb", ".php"]
 
         for folder, prefix in ((MODULE_DIR, "modules"),):
@@ -148,6 +149,25 @@ class LazyFramework:
                 self.modules[key] = p
                 self.metadata[key] = self._read_meta(p)
                 # HAPUS: self.load_module(key) ← JANGAN IMPORT DI SINI!
+
+     
+            self.auto_run_modules()
+     
+    def auto_run_modules(self):
+        if not self.modules:
+            console.print("No modules found.")
+            return
+        console.print(f"Found {len(self.modules)} module(s):")
+        for key, path in sorted(self.modules.items()):
+            rel = path.relative_to(BASE_DIR)
+            if path.suffix == ".py":
+                try:
+                    compile(path.read_bytes(), str(path), 'exec')
+                    console.print(f"  OK  {rel}")
+                except Exception as e:
+                    console.print(f"  ERR {rel} → {e}")
+            else:
+                console.print(f"  FILE {rel}")
 
     def _read_meta(self, path):
         data = {"description": "(No description available)", "options": [], "dependencies": [], "rank": "Normal"}
@@ -646,6 +666,12 @@ class LazyFramework:
             console.print("Changed Directory to: " + os.getcwd())
         except Exception as e: 
             console.print("Error: " + str(e), style="red")
+    def cmd_pwd(self, args):
+           try:
+               """Print current working directory"""
+               console.print(f"[bold cyan]Current Directory:[/bold cyan] [white]{os.getcwd()}[/white]")
+           except Exception as e:
+               console.print(f"[red]Error:[/red] {e}", style="red")
 
     def cmd_ls(self, args):
         try:
